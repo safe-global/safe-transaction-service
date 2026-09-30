@@ -142,6 +142,8 @@ jobs:
         context: .
         file: docker/web/Dockerfile
         push: true
+        build-args: |
+          BUILD_COMMIT=${{ github.sha }}
         tags: |
           safeglobal/safe-transaction-service:staging
           ghcr.io/safe-global/safe-transaction-service:staging
@@ -157,6 +159,8 @@ jobs:
         context: .
         file: docker/web/Dockerfile
         push: true
+        build-args: |
+          BUILD_COMMIT=${{ github.sha }}
         tags: |
           safeglobal/safe-transaction-service:develop
           ghcr.io/safe-global/safe-transaction-service:develop
@@ -172,6 +176,8 @@ jobs:
         context: .
         file: docker/web/Dockerfile
         push: true
+        build-args: |
+          BUILD_COMMIT=${{ github.sha }}
         tags: |
           safeglobal/safe-transaction-service:${{ github.event.release.tag_name }}
           safeglobal/safe-transaction-service:latest

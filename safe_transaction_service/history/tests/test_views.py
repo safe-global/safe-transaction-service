@@ -106,6 +106,13 @@ class TestViewsV150(SafeTestCaseMixin, APITestCase):
         url = reverse("v1:history:about")
         response = self.client.get(url, format="json")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIsNone(response.data["build_commit"])
+
+        commit = "a618123e4f0c3b1d2e5f6a7b8c9d0e1f2a3b4c5d"
+        with override_settings(BUILD_COMMIT=commit):
+            response = self.client.get(url, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["build_commit"], commit)
 
         for node_url, expected in (
             (None, None),

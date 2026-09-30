@@ -83,6 +83,7 @@ class AboutView(APIView):
         content = {
             "name": "Safe Transaction Service",
             "version": __version__,
+            "build_commit": settings.BUILD_COMMIT or None,
             "api_version": request.version,
             "secure": request.is_secure(),
             "host": request.get_host(),

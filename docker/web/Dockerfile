@@ -41,3 +41,7 @@ COPY --chown=python:python . .
 USER 999:999
 
 RUN DJANGO_SETTINGS_MODULE=config.settings.production DJANGO_DOT_ENV_FILE=.env.tracing.sample python manage.py collectstatic --noinput
+
+# Declared last so a new commit does not invalidate the cached layers above
+ARG BUILD_COMMIT
+ENV BUILD_COMMIT=${BUILD_COMMIT}

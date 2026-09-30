@@ -50,6 +50,10 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/3.2/ref/settings/#force-script-name
 FORCE_SCRIPT_NAME = env("FORCE_SCRIPT_NAME", default=None)
 
+# Commit the image was built from. A Docker build without the argument
+# still sets the variable, empty
+BUILD_COMMIT = env("BUILD_COMMIT", default="")
+
 # SSO
 SSO_ENABLED = False
 
