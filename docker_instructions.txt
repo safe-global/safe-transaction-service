@@ -15,4 +15,3 @@ sudo docker-compose up
 
 # Run container in bash mode
 sudo docker-compose run web bash
-
