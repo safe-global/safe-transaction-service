@@ -1079,6 +1079,15 @@ class InternalTxQuerySet(models.QuerySet):
     def ether_incoming_txs_for_address(self, address: str):
         return self.ether_txs().filter(to=address)
 
+    def ether_outgoing_txs_for_address(self, address: str):
+        """
+        :param address:
+        :return: Ether transfers sent by `address`, excluding self transfers. Self transfers
+            are already returned by `ether_incoming_txs_for_address`. Transfers with `to=None`
+            are kept.
+        """
+        return self.ether_txs().filter(_from=address).exclude(to=address)
+
     def token_txs(self):
         erc20_queryset = ERC20Transfer.objects.token_txs()
         erc721_queryset = ERC721Transfer.objects.token_txs()
@@ -1134,10 +1143,14 @@ class InternalTxQuerySet(models.QuerySet):
         erc20_out_queryset: QuerySet,
         erc721_in_queryset: QuerySet,
         erc721_out_queryset: QuerySet,
-        ether_queryset: QuerySet,
+        ether_in_queryset: QuerySet,
+        ether_out_queryset: QuerySet,
     ) -> TransferDict:
+        # Postgres resolves UNION column types from left to right. Ether querysets use
+        # NULL for token columns, so two ether querysets must not be next to each other,
+        # or NULL resolves to text and does not match the bytea token address.
         return (
-            ether_queryset.values(*TRANSFER_FIELDS_WITH_TRACE_ADDRESS)
+            ether_in_queryset.values(*TRANSFER_FIELDS_WITH_TRACE_ADDRESS)
             .union(
                 erc20_in_queryset.values(*TRANSFER_FIELDS_WITH_TRACE_ADDRESS), all=True
             )
@@ -1150,6 +1163,9 @@ class InternalTxQuerySet(models.QuerySet):
             .union(
                 erc721_out_queryset.values(*TRANSFER_FIELDS_WITH_TRACE_ADDRESS),
                 all=True,
+            )
+            .union(
+                ether_out_queryset.values(*TRANSFER_FIELDS_WITH_TRACE_ADDRESS), all=True
             )
         )
 

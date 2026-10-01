@@ -3638,6 +3638,53 @@ class TestViewsV150(SafeTestCaseMixin, APITestCase):
             for result in response.data["results"]:
                 self.assertNotEqual(result["type"], TransferType.ETHER_TRANSFER.name)
 
+    def test_transfers_view_ether_incoming_and_outgoing(self):
+        safe_address = Account.create().address
+        incoming = InternalTxFactory(to=safe_address, value=5)
+        outgoing = InternalTxFactory(_from=safe_address, value=6)
+        outgoing_to_none = InternalTxFactory(_from=safe_address, value=7)
+        InternalTx.objects.filter(pk=outgoing_to_none.pk).update(to=None)
+        self_transfer = InternalTxFactory(_from=safe_address, to=safe_address, value=8)
+        InternalTxFactory(value=9)  # Not related to the Safe
+
+        response = self.client.get(
+            reverse("v1:history:transfers", args=(safe_address,)), format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 4)
+        self.assertCountEqual(
+            [result["transactionHash"] for result in response.json()["results"]],
+            [
+                internal_tx.ethereum_tx_id
+                for internal_tx in (
+                    incoming,
+                    outgoing,
+                    outgoing_to_none,
+                    self_transfer,
+                )
+            ],
+        )
+        for result in response.json()["results"]:
+            self.assertEqual(result["type"], TransferType.ETHER_TRANSFER.name)
+
+    @override_settings(TX_SERVICE_ALL_TXS_ENDPOINT_LIMIT_TRANSFERS=1)
+    def test_transfers_view_ether_limit_per_direction(self):
+        safe_address = Account.create().address
+        InternalTxFactory(to=safe_address, value=5)
+        newest_incoming = InternalTxFactory(to=safe_address, value=5)
+        InternalTxFactory(_from=safe_address, value=5)
+        newest_outgoing = InternalTxFactory(_from=safe_address, value=5)
+
+        response = self.client.get(
+            reverse("v1:history:transfers", args=(safe_address,)), format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 2)
+        self.assertCountEqual(
+            [result["transactionHash"] for result in response.json()["results"]],
+            [newest_incoming.ethereum_tx_id, newest_outgoing.ethereum_tx_id],
+        )
+
     def test_get_transfer_view(self):
         # test wrong random transfer_id
         transfer_id = FuzzyText(length=6).fuzz()
