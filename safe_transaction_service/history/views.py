@@ -78,11 +78,14 @@ class AboutView(APIView):
 
     renderer_classes = (JSONRenderer,)
 
-    @method_decorator(cache_page(5 * 60))  # 5 minutes
+    # 5 minutes. The cache is shared by all pods, so the key includes the commit:
+    # otherwise a new image could return the previous commit
+    @method_decorator(cache_page(5 * 60, key_prefix=settings.BUILD_COMMIT))
     def get(self, request, format=None):
         content = {
             "name": "Safe Transaction Service",
             "version": __version__,
+            "build_commit": settings.BUILD_COMMIT or None,
             "api_version": request.version,
             "secure": request.is_secure(),
             "host": request.get_host(),
