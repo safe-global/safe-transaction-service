@@ -37,7 +37,7 @@ class UserOperation(models.Model):
     ethereum_tx = models.ForeignKey(
         history_models.EthereumTx, on_delete=models.CASCADE, null=True, blank=True
     )
-    sender = EthereumAddressBinaryField(db_index=True)
+    sender = EthereumAddressBinaryField()  # Covered by the (sender, nonce) index
     nonce = Uint256Field()
     init_code = models.BinaryField(null=True, blank=True, editable=True)
     call_data = models.BinaryField(null=True, blank=True, editable=True)
@@ -201,10 +201,12 @@ class SafeOperation(TimeStampedModel):
 class SafeOperationConfirmation(TimeStampedModel):
     """Signature provided by a Safe owner to authorize a Safe operation."""
 
+    # Covered by the unique (safe_operation, owner) index
     safe_operation = models.ForeignKey(
         SafeOperation,
         on_delete=models.CASCADE,
         related_name="confirmations",
+        db_index=False,
     )
     owner = EthereumAddressBinaryField()
     signature = HexV2Field(null=True, default=None, max_length=SIGNATURE_LENGTH)
