@@ -45,6 +45,7 @@ This repository includes multiple indexers under `safe_transaction_service/histo
 
 ## Dependency Management
 - Dependencies are declared in `pyproject.toml` (`[project] dependencies` for production, `[dependency-groups] dev` for everything else — test and dev tools are a single group).
+- Ruff is not a dependency: its version comes from the `ruff-pre-commit` rev in `.pre-commit-config.yaml`. Run it with `pre-commit run ruff-check --all-files` and `pre-commit run ruff-format --all-files`.
 - `uv.lock` is the source of pinned truth and must be committed. Always run `uv lock` after editing `pyproject.toml`, then commit both files together.
 - All `uv sync` calls use `--frozen`. CI is the canonical way to update dependencies; never bypass the lockfile locally.
 - `[tool.uv] exclude-newer = "7 days"` rejects packages published less than 7 days ago. If `uv lock` fails due to a recently released pin, revert it to the previous version and re-pin after 7 days.

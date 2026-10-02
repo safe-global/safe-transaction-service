@@ -55,7 +55,6 @@ dev = [
     "pytest-env",
     "pytest-rerunfailures",
     "pytest-sugar",
-    "ruff",
 ]
 
 [build-system]
@@ -80,7 +79,7 @@ exclude = [
 ]
 
 [tool.ruff.lint]
-extend-select = [
+select = [
     "E",  # pycodestyle errors
     "W",  # pycodestyle warnings
     "F",  # pyflakes
