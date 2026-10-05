@@ -33,7 +33,7 @@ dependencies = [
     "redis[hiredis]==8.1.0",
     "requests==2.34.2",
     "safe-eth-py[django]==7.26.1",
-    "web3==7.16.0",
+    "web3==8.0.0",
     "cachecontrol==0.14.4",
     "google-auth==2.58.1",
 ]
