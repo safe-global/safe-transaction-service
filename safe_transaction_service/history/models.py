@@ -621,7 +621,10 @@ class TokenTransfer(models.Model):
     """Abstract base model normalizing token transfer events across standards."""
 
     objects = TokenTransferManager.from_queryset(TokenTransferQuerySet)()
-    ethereum_tx = models.ForeignKey(EthereumTx, on_delete=models.CASCADE)
+    # Covered by the unique (ethereum_tx, log_index) index
+    ethereum_tx = models.ForeignKey(
+        EthereumTx, on_delete=models.CASCADE, db_index=False
+    )
     timestamp = models.DateTimeField(db_index=True)
     block_number = models.PositiveIntegerField()
     address = EthereumAddressBinaryField()  # Token address
@@ -1200,8 +1203,12 @@ class InternalTx(models.Model):
     """
 
     objects = InternalTxManager.from_queryset(InternalTxQuerySet)()
+    # Covered by the unique (ethereum_tx, trace_address) index
     ethereum_tx = models.ForeignKey(
-        EthereumTx, on_delete=models.CASCADE, related_name="internal_txs"
+        EthereumTx,
+        on_delete=models.CASCADE,
+        related_name="internal_txs",
+        db_index=False,
     )
     timestamp = models.DateTimeField(db_index=True)
     block_number = models.PositiveIntegerField()
@@ -1714,7 +1721,7 @@ class MultisigTransaction(TimeStampedModel):
 
     objects = MultisigTransactionManager.from_queryset(MultisigTransactionQuerySet)()
     safe_tx_hash = Keccak256Field(primary_key=True)
-    safe = EthereumAddressBinaryField(db_index=True)
+    safe = EthereumAddressBinaryField()  # Covered by the (safe, nonce, created) index
     proposer = EthereumAddressBinaryField(null=True)
     proposed_by_delegate = EthereumAddressBinaryField(null=True, blank=True)
     ethereum_tx = models.ForeignKey(
@@ -1925,9 +1932,9 @@ class MultisigConfirmation(TimeStampedModel):
         null=True,
         related_name="confirmations",
     )
-    multisig_transaction_hash = Keccak256Field(
-        null=True, db_index=True
-    )  # Use this while we don't have a `multisig_transaction`
+    # Use this while we don't have a `multisig_transaction`.
+    # Covered by the unique (multisig_transaction_hash, owner) index
+    multisig_transaction_hash = Keccak256Field(null=True)
     owner = EthereumAddressBinaryField()
 
     signature = HexV2Field(null=True, default=None, max_length=MAX_SIGNATURE_LENGTH)
@@ -2252,10 +2259,12 @@ class SafeContractDelegate(models.Model):
     """
 
     objects = SafeContractDelegateManager()
+    # Covered by the unique (safe_contract, delegate, delegator) index
     safe_contract = models.ForeignKey(
         SafeContract,
         on_delete=models.CASCADE,
         related_name="safe_contract_delegates",
+        db_index=False,
         null=True,
         default=None,
     )  # If safe_contract is not defined, delegate is valid for every Safe which delegator is an owner
@@ -2295,7 +2304,10 @@ class SafeRelevantTransaction(models.Model):
 
     objects = SafeRelevantTransactionManager()
     timestamp = models.DateTimeField()
-    ethereum_tx = models.ForeignKey(EthereumTx, on_delete=models.CASCADE)
+    # Covered by the unique (ethereum_tx, safe) index
+    ethereum_tx = models.ForeignKey(
+        EthereumTx, on_delete=models.CASCADE, db_index=False
+    )
     safe = (
         EthereumAddressBinaryField()
     )  # Not using a ForeignKey as Safe might not be created yet in `SafeContract` table
@@ -2579,9 +2591,9 @@ class SafeStatus(SafeStatusBase):
         related_name="safe_status",
         primary_key=True,
     )  # Make internal_tx the primary key
-    address = EthereumAddressBinaryField(
-        db_index=True
-    )  # Address is not the primary key
+    # Address is not the primary key.
+    # Covered by the (address, nonce) index
+    address = EthereumAddressBinaryField()
 
     class Meta:
         indexes = [

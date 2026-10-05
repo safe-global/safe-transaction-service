@@ -113,10 +113,12 @@ class SafeMessageConfirmation(TimeStampedModel):
     Owner signature for a Safe Message
     """
 
+    # Covered by the unique (safe_message, owner) index
     safe_message = models.ForeignKey(
         SafeMessage,
         on_delete=models.CASCADE,
         null=True,
+        db_index=False,
         default=None,
         related_name="confirmations",
     )
