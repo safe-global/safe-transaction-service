@@ -11,7 +11,6 @@ from django.db import transaction
 import gevent
 import orjson
 from kombu import Connection, Exchange, Producer
-from kombu.common import maybe_declare
 from kombu.connection import ConnectionPool
 from kombu.pools import ProducerPool
 from kombu.transport.base import StdChannel
@@ -133,17 +132,6 @@ class QueueService(BaseQueueService):
         )
         self.unsent_events: list[tuple[bytes, str]] = []
 
-    def _declare_exchanges(self, producer: Producer) -> None:
-        """
-        Declare both exchanges, once per connection (kombu cache). Never
-        raises: a failure is logged and retried on the next publish.
-        """
-        try:
-            maybe_declare(self.exchange, producer.channel)
-            maybe_declare(self.legacy_exchange, producer.channel)
-        except Exception as exc:
-            logger.error("Could not declare exchanges: %s", exc, exc_info=True)
-
     def _open_connections(self) -> list[Connection]:
         pool = self.connection_pool
         return [
@@ -183,8 +171,9 @@ class QueueService(BaseQueueService):
             producer.publish(
                 event,
                 exchange=self.exchange,
-                # Declared again if `retry` reconnects to a broker without it
-                declare=[self.exchange],
+                # Cached per connection by kombu, declared again when `retry`
+                # reconnects, also in the middle of a batch
+                declare=[self.exchange, self.legacy_exchange],
                 routing_key=routing_key,
                 content_type="application/json",
                 content_encoding="utf-8",
@@ -210,7 +199,6 @@ class QueueService(BaseQueueService):
         total = 0
         try:
             with self.producer_pool.acquire(block=False) as producer:
-                self._declare_exchanges(producer)
                 for event, routing_key in events:
                     if not self._try_publish(producer, event, routing_key):
                         break
