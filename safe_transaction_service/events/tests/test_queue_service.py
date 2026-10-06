@@ -3,13 +3,19 @@ import json
 from unittest import mock
 
 from django.conf import settings
-from django.test import SimpleTestCase, TestCase
+from django.test import SimpleTestCase, TestCase, override_settings
 
 from kombu import Connection, Exchange, Queue
 from kombu.exceptions import LimitExceeded
-from kombu.pools import producers
 
-from ..services.queue_service import EVENTS_APP_ID, QueueService
+from ..services import queue_service as queue_service_module
+from ..services.queue_service import (
+    EVENTS_APP_ID,
+    LegacyExchange,
+    QueueService,
+    close_queue_service,
+    get_queue_service,
+)
 
 
 class TestQueueService(TestCase):
@@ -132,7 +138,7 @@ class TestQueueService(TestCase):
         queue_service.clear_unsent_events()
 
         with mock.patch.object(
-            producers[queue_service.connection], "acquire", side_effect=LimitExceeded
+            queue_service.producer_pool, "acquire", side_effect=LimitExceeded
         ):
             self.assertEqual(queue_service.send_events([{"message": "buffered"}]), 0)
         self.assertEqual(len(queue_service.unsent_events), 1)
@@ -171,6 +177,109 @@ class TestQueueService(TestCase):
         with self.captureOnCommitCallbacks() as callbacks:
             queue_service.send_events_on_commit([])
         self.assertEqual(callbacks, [])
+
+    def _make_queue_service(self) -> QueueService:
+        queue_service = QueueService()
+        self.addCleanup(queue_service.close)
+        return queue_service
+
+    def _spy_bind_to(self):
+        return mock.patch.object(
+            LegacyExchange, "bind_to", autospec=True, side_effect=Exchange.bind_to
+        )
+
+    def test_init_does_not_open_connections(self):
+        self.assertEqual(self._make_queue_service()._open_connections(), [])
+
+    def test_exchanges_restored_after_broker_loses_them(self):
+        queue_service = self._make_queue_service()
+        queue_service.send_event({"message": "before"})
+        self.assertEqual(self._get_message(), {"message": "before"})
+
+        # Broker restart: exchanges, bindings and sockets are lost
+        with self.conn.channel() as channel:
+            Exchange(settings.EVENTS_QUEUE_TOPIC_EXCHANGE_NAME)(channel).delete()
+            Exchange(settings.EVENTS_QUEUE_EXCHANGE_NAME)(channel).delete()
+        for conn in queue_service._open_connections():
+            conn.collect()
+        with self.conn.channel() as channel:
+            self.test_queue(channel).declare()
+
+        self.assertEqual(queue_service.send_event({"message": "after"}), 1)
+        self.assertEqual(self._get_message(), {"message": "after"})
+
+    def test_legacy_binding_declared_once_per_connection(self):
+        queue_service = self._make_queue_service()
+        with self._spy_bind_to() as bind_to_mock:
+            queue_service.send_event({"message": "1"})
+            queue_service.send_event({"message": "2"})
+        bind_to_mock.assert_called_once()
+
+    def test_bind_failure_still_publishes_and_retries(self):
+        queue_service = self._make_queue_service()
+        with mock.patch.object(LegacyExchange, "bind_to", side_effect=OSError):
+            with self.assertLogs(queue_service_module.logger, level="ERROR"):
+                self.assertEqual(queue_service.send_event({"message": "1"}), 1)
+        self.assertEqual(queue_service.unsent_events, [])
+
+        with self._spy_bind_to() as bind_to_mock:
+            self.assertEqual(queue_service.send_event({"message": "2"}), 1)
+        bind_to_mock.assert_called_once()
+
+    @override_settings(EVENTS_QUEUE_POOL_CONNECTIONS_LIMIT=2)
+    def test_pool_limit_applies_to_connections_and_producers(self):
+        queue_service = self._make_queue_service()
+        self.assertEqual(queue_service.connection_pool.limit, 2)
+        self.assertEqual(queue_service.producer_pool.limit, 2)
+
+        producer_1 = queue_service.producer_pool.acquire(block=False)
+        producer_2 = queue_service.producer_pool.acquire(block=False)
+        with self.assertRaises(LimitExceeded):
+            queue_service.producer_pool.acquire(block=False)
+        producer_1.release()
+        producer_2.release()
+        self.assertEqual(len(queue_service._open_connections()), 2)
+
+    def test_connection_name(self):
+        queue_service = self._make_queue_service()
+        queue_service.send_event({"message": "named"})
+        (conn,) = queue_service._open_connections()
+        connection_name = conn.connection.client_properties["connection_name"]
+        self.assertTrue(connection_name.startswith(f"{EVENTS_APP_ID}@"))
+
+    def test_close(self):
+        queue_service = QueueService()
+        with mock.patch.object(QueueService, "_try_publish", return_value=False):
+            queue_service.send_event({"message": "buffered"})
+        (conn,) = queue_service._open_connections()
+        self.assertTrue(conn.connected)
+
+        queue_service.close()
+        self.assertFalse(conn.connected)
+        self.assertEqual(queue_service.unsent_events, [])
+        self.assertEqual(self._get_message(), {"message": "buffered"})
+
+        queue_service.close()
+        self.assertEqual(queue_service.send_event({"message": "2"}), 0)
+        with self.assertLogs(queue_service_module.logger, level="WARNING") as logs:
+            queue_service.close()
+        self.assertIn("Dropping 1 unsent events", logs.output[-1])
+
+
+class TestCloseQueueService(SimpleTestCase):
+    def setUp(self):
+        get_queue_service.cache_clear()
+        self.addCleanup(get_queue_service.cache_clear)
+
+    def test_close_queue_service_does_not_build_one(self):
+        with mock.patch.object(QueueService, "close") as close_mock:
+            close_queue_service()
+            self.assertEqual(get_queue_service.cache_info().currsize, 0)
+            close_mock.assert_not_called()
+
+            get_queue_service()
+            close_queue_service()
+            close_mock.assert_called_once_with()
 
 
 class TestBuildRoutingKey(SimpleTestCase):
