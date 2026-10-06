@@ -5,9 +5,9 @@ from config.gunicorn import (
     gunicorn_workers,
 )
 
-max_requests = 20_000  # Restart a worker after it has processed a given number of requests (for memory leaks)
+max_requests = 100_000  # Restart a worker after it has processed a given number of requests (for memory leaks)
 max_requests_jitter = (
-    10_000  # Randomize max_requests to prevent all workers restarting at the same time
+    50_000  # Randomize max_requests to prevent all workers restarting at the same time
 )
 # graceful_timeout = 90  # https://stackoverflow.com/a/24305939
 loglevel = "info"
