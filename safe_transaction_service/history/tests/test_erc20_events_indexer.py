@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: FSL-1.1-MIT
+from itertools import product
 from unittest import mock
 from unittest.mock import MagicMock
 
@@ -10,7 +11,7 @@ from safe_eth.eth.tests.ethereum_test_case import EthereumTestCaseMixin
 from safe_transaction_service.events.services.queue_service import QueueService
 
 from ..indexers import Erc20EventsIndexerProvider
-from ..indexers.erc20_events_indexer import AddressesCache
+from ..indexers.erc20_events_indexer import EIP7708_SYSTEM_ADDRESS, AddressesCache
 from ..models import (
     ERC20Transfer,
     ERC721Transfer,
@@ -314,3 +315,37 @@ class TestErc20EventsIndexer(EthereumTestCaseMixin, TestCase):
         self.assertEqual(
             self.erc20_events_indexer.addresses_cache.addresses, expected_addresses
         )
+
+    def test_do_node_query_eip7708_transfers(self):
+        addresses = {HexBytes(log_receipt_mock[0]["args"]["to"])}
+        token_transfer = log_receipt_mock[0]
+        eip7708_transfer = {
+            **token_transfer,
+            "address": EIP7708_SYSTEM_ADDRESS,
+            "logIndex": 1,
+        }
+        transfer_events = [token_transfer, eip7708_transfer]
+
+        with mock.patch.object(
+            self.erc20_events_indexer.ethereum_client.erc20,
+            "get_total_transfer_history",
+            return_value=transfer_events,
+        ):
+            # `query_chunk_size=0` makes the indexer filter addresses itself instead of the RPC
+            for query_chunk_size, index_eip7708_transfers in product(
+                (10, 0), (False, True)
+            ):
+                with self.subTest(
+                    query_chunk_size=query_chunk_size,
+                    index_eip7708_transfers=index_eip7708_transfers,
+                ):
+                    self.erc20_events_indexer.query_chunk_size = query_chunk_size
+                    self.erc20_events_indexer.eth_erc20_index_eip7708_transfers = (
+                        index_eip7708_transfers
+                    )
+                    self.assertEqual(
+                        self.erc20_events_indexer._do_node_query(addresses, 0, 10),
+                        transfer_events
+                        if index_eip7708_transfers
+                        else [token_transfer],
+                    )
