@@ -47,6 +47,7 @@ from ..models import (
     SafeMasterCopy,
     SafeRelevantTransaction,
     SafeStatus,
+    post_bulk_create,
 )
 
 logger = logging.getLogger(__name__)
@@ -566,9 +567,15 @@ class SafeTxProcessor(TxProcessor):
             threshold = arguments["_threshold"]
             fallback_handler = arguments.get("fallbackHandler", NULL_ADDRESS)
             nonce = 0
-            SafeContract.objects.upsert_from_ethereum_tx_hash(
-                contract_address, internal_tx.ethereum_tx_id
+            safe_contract = SafeContract.objects.upsert_from_ethereum_tx(
+                contract_address, internal_tx.ethereum_tx
             )
+            # Only `setup` sends `SAFE_CREATED`: several indexers insert the same
+            # Safe, and the event is published on commit with the Safe status stored.
+            # The upsert leaves `created` as the current time in memory, load the
+            # stored one so reprocessing an old Safe is not a relevant event
+            safe_contract.refresh_from_db(fields=["created"])
+            post_bulk_create.send(SafeContract, instance=safe_contract, created=True)
 
             self.store_new_safe_status(
                 SafeLastStatus(

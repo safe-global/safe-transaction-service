@@ -687,6 +687,15 @@ class TestBannedSafeEvents(SafeTestCaseMixin, TestCase):
         send_events_mock.assert_not_called()
 
     @mock.patch.object(QueueService, "send_events")
+    def test_safe_created_event_not_sent_for_banned_safe(
+        self, send_events_mock: MagicMock
+    ):
+        safe_contract = SafeContractFactory(banned=True)
+        with self.captureOnCommitCallbacks(execute=True):
+            post_bulk_create.send(SafeContract, instance=safe_contract, created=True)
+        send_events_mock.assert_not_called()
+
+    @mock.patch.object(QueueService, "send_events")
     def test_message_events_not_sent_for_banned_safe(self, send_events_mock: MagicMock):
         safe_address = self.deploy_test_safe().address
         SafeContractFactory(address=safe_address, banned=True)
