@@ -2142,21 +2142,24 @@ class SafeContractManager(models.Manager):
         """
         return set(self.filter(address__in=addresses).values_list("address", flat=True))
 
-    def upsert_from_ethereum_tx_hash(
-        self, address: ChecksumAddress, ethereum_tx_id: HexBytes
-    ) -> None:
+    def upsert_from_ethereum_tx(
+        self, address: ChecksumAddress, ethereum_tx: "EthereumTx"
+    ) -> "SafeContract":
         """
         Insert a new SafeContract or update ``ethereum_tx_id`` on conflict. Single query.
 
         :param address: Safe contract address
-        :param ethereum_tx_id: Creation transaction hash
+        :param ethereum_tx: Creation transaction
+        :return: SafeContract instance with ``ethereum_tx`` cached
         """
+        safe_contract = self.model(address=address, ethereum_tx=ethereum_tx)
         self.bulk_create(
-            [self.model(address=address, ethereum_tx_id=ethereum_tx_id)],
+            [safe_contract],
             update_conflicts=True,
             unique_fields=["address"],
             update_fields=["ethereum_tx"],
         )
+        return safe_contract
 
 
 class SafeContractQuerySet(models.QuerySet):

@@ -1,9 +1,11 @@
 # SPDX-License-Identifier: FSL-1.1-MIT
 import logging
+from datetime import timedelta
 from unittest import mock
 from unittest.mock import MagicMock
 
 from django.test import TestCase
+from django.utils import timezone
 
 from eth_account import Account
 from eth_utils import keccak
@@ -47,6 +49,7 @@ from .factories import (
     MultisigConfirmationFactory,
     MultisigTransactionFactory,
     SafeContractDelegateFactory,
+    SafeContractFactory,
     SafeLastStatusFactory,
     SafeMasterCopyFactory,
 )
@@ -499,6 +502,65 @@ class TestSafeTxProcessor(SafeTestCaseMixin, TestCase):
                 }
             ]
         )
+
+    @mock.patch.object(QueueService, "send_events")
+    def test_tx_processor_setup_sends_safe_created_event(
+        self, send_events_mock: MagicMock
+    ):
+        safe_address = Account.create().address
+        internal_tx_decoded = InternalTxDecodedFactory(
+            function_name="setup",
+            internal_tx___from=safe_address,
+            internal_tx__value=0,
+        )
+        ethereum_tx = internal_tx_decoded.internal_tx.ethereum_tx
+
+        # Indexers insert the Safe before `setup` is processed, with no event
+        with self.captureOnCommitCallbacks(execute=True):
+            SafeContract.objects.bulk_create(
+                [SafeContract(address=safe_address, ethereum_tx=ethereum_tx)],
+                ignore_conflicts=True,
+            )
+        send_events_mock.assert_not_called()
+
+        with self.captureOnCommitCallbacks(execute=True):
+            self.tx_processor.process_decoded_transactions([internal_tx_decoded])
+
+        send_events_mock.assert_called_once_with(
+            [
+                {
+                    "address": safe_address,
+                    "type": TransactionServiceEventType.SAFE_CREATED.name,
+                    "txHash": to_0x_hex_str(HexBytes(ethereum_tx.tx_hash)),
+                    "blockNumber": ethereum_tx.block_id,
+                    "chainId": str(EthereumNetwork.GANACHE.value),
+                }
+            ]
+        )
+
+    @mock.patch.object(QueueService, "send_events")
+    def test_tx_processor_setup_reprocessed_sends_no_safe_created_event(
+        self, send_events_mock: MagicMock
+    ):
+        safe_address = Account.create().address
+        internal_tx_decoded = InternalTxDecodedFactory(
+            function_name="setup",
+            internal_tx___from=safe_address,
+            internal_tx__value=0,
+        )
+        SafeContractFactory(
+            address=safe_address,
+            ethereum_tx=internal_tx_decoded.internal_tx.ethereum_tx,
+        )
+        # Safe stored long ago, its `setup` is processed again
+        SafeContract.objects.filter(address=safe_address).update(
+            created=timezone.now() - timedelta(days=1)
+        )
+
+        with self.captureOnCommitCallbacks(execute=True):
+            self.tx_processor.process_decoded_transactions([internal_tx_decoded])
+
+        send_events_mock.assert_not_called()
 
     @mock.patch.object(QueueService, "send_events")
     def test_tx_processor_approve_hash_existing_confirmation_sends_no_event(
