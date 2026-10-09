@@ -84,7 +84,7 @@ class CacheSafeTxsView:
             self.redis.hset(self.cache_name, cache_path, data)
             self.redis.expire(self.cache_name, timeout)
         else:
-            logger.warning("Cache txs view is disabled")
+            logger.debug("Cache txs view is disabled")
 
     def remove_cache(self):
         """
