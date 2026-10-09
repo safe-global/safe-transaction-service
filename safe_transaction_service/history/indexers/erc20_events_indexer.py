@@ -9,7 +9,7 @@ from django.db.models import BinaryField, QuerySet
 from django.db.models.functions import Cast
 from django.db.models.query import EmptyQuerySet
 
-from eth_typing import ChecksumAddress
+from eth_typing import ChecksumAddress, HexAddress, HexStr
 from hexbytes import HexBytes
 from safe_eth.eth import EthereumClient
 from web3.contract.contract import ContractEvent
@@ -28,6 +28,12 @@ from ..services.event_service import set_safe_membership
 from .events_indexer import EventsIndexer
 
 logger = getLogger(__name__)
+
+# EIP-7708 makes every ETH transfer emit a log from this address, using the same
+# topic as the ERC20 `Transfer` event and the amount in wei as `value`
+EIP7708_SYSTEM_ADDRESS = ChecksumAddress(
+    HexAddress(HexStr("0xffffFFFfFFffffffffffffffFfFFFfffFFFfFFfE"))
+)
 
 
 class AddressesCache(NamedTuple):
@@ -48,6 +54,7 @@ class Erc20EventsIndexerProvider:
         return Erc20EventsIndexer(
             EthereumClient(settings.ETHEREUM_NODE_URL),
             eth_erc20_load_addresses_chunk_size=settings.ETH_ERC20_LOAD_ADDRESSES_CHUNK_SIZE,
+            eth_erc20_index_eip7708_transfers=settings.ETH_ERC20_INDEX_EIP7708_TRANSFERS,
         )
 
     @classmethod
@@ -75,6 +82,9 @@ class Erc20EventsIndexer(EventsIndexer):
         self.addresses_cache: AddressesCache | None = None
         self.eth_erc20_load_addresses_chunk_size = kwargs.get(
             "eth_erc20_load_addresses_chunk_size", 500_000
+        )
+        self.eth_erc20_index_eip7708_transfers = kwargs.get(
+            "eth_erc20_index_eip7708_transfers", False
         )
 
     @property
@@ -126,22 +136,20 @@ class Erc20EventsIndexer(EventsIndexer):
                 to_block=to_block_number,
             )
 
-        if parameter_addresses:
-            return [
-                transfer_event
-                for transfer_event in transfer_events
-                if transfer_event["blockHash"]
-                != transfer_event["transactionHash"]  # CELO ERC20 rewards
-            ]
-
-        # Every ERC20/721 event is returned, we need to filter ourselves
+        index_eip7708_transfers = self.eth_erc20_index_eip7708_transfers
         return [
             transfer_event
             for transfer_event in transfer_events
             if transfer_event["blockHash"]
             != transfer_event["transactionHash"]  # CELO ERC20 rewards
             and (
-                HexBytes(transfer_event["args"]["to"]) in addresses
+                index_eip7708_transfers
+                or transfer_event["address"] != EIP7708_SYSTEM_ADDRESS
+            )
+            # If addresses were not filtered by the RPC, every ERC20/721 event is returned
+            and (
+                parameter_addresses
+                or HexBytes(transfer_event["args"]["to"]) in addresses
                 or HexBytes(transfer_event["args"]["from"]) in addresses
             )
         ]

@@ -654,6 +654,10 @@ ETH_ERC20_INDEX_MAX_CONSECUTIVE_FAILURES = env.int(
 ETH_ERC20_LOAD_ADDRESSES_CHUNK_SIZE = env.int(
     "ETH_ERC20_LOAD_ADDRESSES_CHUNK_SIZE", default=500_000
 )  # Load Safe addresses for the ERC20 indexer with a database iterator with the defined `chunk_size`
+ETH_ERC20_INDEX_EIP7708_TRANSFERS = env.bool(
+    "ETH_ERC20_INDEX_EIP7708_TRANSFERS", default=False
+)  # Index EIP-7708 ETH transfer logs (emitted by `0xff...fe` with the ERC20 `Transfer` topic) as ERC20 transfers.
+# ETH transfers are already indexed as internal txs, so enabling it stores every ETH transfer twice
 ETH_EVENTS_IGNORED_INITIATORS: set[ChecksumAddress] = {
     ChecksumAddress(HexAddress(HexStr(address)))
     for address in env.list("ETH_EVENTS_IGNORED_INITIATORS", default=[])
