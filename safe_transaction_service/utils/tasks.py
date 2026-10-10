@@ -1,14 +1,16 @@
 # SPDX-License-Identifier: FSL-1.1-MIT
 import contextlib
+from typing import Any
 
 from django.conf import settings
 
 import gevent
 from celery.app.task import Task as CeleryTask
-from celery.signals import worker_shutting_down
+from celery.signals import worker_shutdown, worker_shutting_down
 from celery.utils.log import get_task_logger
 from redis.exceptions import LockError
 
+from ..events.services.queue_service import close_queue_service
 from .redis import get_redis
 
 logger = get_task_logger(__name__)
@@ -24,6 +26,11 @@ def worker_shutting_down_handler(sig, how, exitcode, **kwargs):
     gevent.spawn(
         release_locks_on_worker_shutdown
     )  # If not raises a `BlockingSwitchOutError`
+
+
+@worker_shutdown.connect
+def worker_shutdown_handler(**kwargs: Any) -> None:
+    close_queue_service()
 
 
 def release_locks_on_worker_shutdown():

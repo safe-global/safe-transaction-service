@@ -1,4 +1,7 @@
 # SPDX-License-Identifier: FSL-1.1-MIT
+from gunicorn.arbiter import Arbiter
+from gunicorn.workers.base import Worker
+
 from config.gunicorn import (
     gunicorn_request_timeout,
     gunicorn_worker_connections,
@@ -18,3 +21,12 @@ timeout = gunicorn_request_timeout
 worker_class = "gunicorn_custom_workers.MyGeventWorker"  # "gevent"
 worker_connections = gunicorn_worker_connections
 workers = gunicorn_workers
+
+
+def worker_exit(server: Arbiter, worker: Worker) -> None:
+    # Django is only loaded in the worker (`preload_app = False`)
+    from safe_transaction_service.events.services.queue_service import (
+        close_queue_service,
+    )
+
+    close_queue_service()

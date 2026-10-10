@@ -1,14 +1,20 @@
 # SPDX-License-Identifier: FSL-1.1-MIT
 import logging
+import socket
+from collections.abc import Callable
 from functools import cache
 from typing import Any
 
 from django.conf import settings
 from django.db import transaction
 
+import gevent
 import orjson
 from kombu import Connection, Exchange, Producer
-from kombu.pools import producers
+from kombu.connection import ConnectionPool
+from kombu.pools import ProducerPool
+from kombu.transport.base import StdChannel
+from kombu.utils.functional import lazy
 
 logger = logging.getLogger(__name__)
 
@@ -17,15 +23,46 @@ logger = logging.getLogger(__name__)
 # know the sender
 EVENTS_APP_ID = "safe-transaction-service"
 
+# A broker that does not answer must not block the process exit
+CLOSE_TIMEOUT_SECONDS = 5
+
+
+class LegacyExchange(Exchange):
+    """
+    Legacy fanout exchange, bound as a destination of the topic exchange
+    (``routing_key="#"``) so its consumers keep receiving every event. The
+    binding is part of the declaration, so kombu creates it again on every
+    new connection.
+    """
+
+    attrs: tuple[tuple[str, Callable[[Any], Any] | None], ...] = Exchange.attrs + (
+        ("source", None),
+    )
+    source: Exchange
+
+    def declare(
+        self,
+        nowait: bool = False,
+        passive: bool | None = None,
+        channel: StdChannel | None = None,
+    ) -> None:
+        super().declare(nowait=nowait, passive=passive, channel=channel)
+        self.bind_to(
+            exchange=self.source, routing_key="#", nowait=nowait, channel=channel
+        )
+
 
 class BaseQueueService:
     """
     Common behavior for the real and the mocked queue services. Subclasses
-    only implement ``send_events``.
+    only implement ``send_events``, and ``close`` if they hold connections.
     """
 
     def send_events(self, payloads: list[dict[str, Any]]) -> int:
         raise NotImplementedError
+
+    def close(self) -> None:
+        pass
 
     def send_event(self, payload: dict[str, Any]) -> int:
         """
@@ -72,51 +109,36 @@ class QueueService(BaseQueueService):
             type="topic",
             durable=True,
         )
-        # Legacy fanout exchange. Existing consumers stay bound to it; we bind
-        # it downstream of the topic exchange (routing_key="#") so every event
-        # still reaches them while consumers migrate to topic-based bindings.
-        self.legacy_exchange = Exchange(
+        self.legacy_exchange = LegacyExchange(
             settings.EVENTS_QUEUE_EXCHANGE_NAME,
             type="fanout",
             durable=True,
+            source=self.exchange,
         )
-        self.connection = Connection(settings.EVENTS_QUEUE_URL)
+        connection = Connection(
+            settings.EVENTS_QUEUE_URL,
+            transport_options={
+                "client_properties": {
+                    "connection_name": f"{EVENTS_APP_ID}@{socket.gethostname()}"
+                }
+            },
+        )
+        # Not the global `kombu.pools`: its connection pool ignores the producer
+        # pool limit
         limit = settings.EVENTS_QUEUE_POOL_CONNECTIONS_LIMIT
-        if limit:
-            producers[self.connection].limit = limit
+        self.connection_pool: ConnectionPool = connection.Pool(limit=limit)
+        self.producer_pool: ProducerPool = ProducerPool(
+            self.connection_pool, limit=limit
+        )
         self.unsent_events: list[tuple[bytes, str]] = []
-        self._ensure_legacy_binding()
 
-    def _ensure_legacy_binding(self) -> None:
-        """
-        Declare both exchanges and bind the legacy fanout exchange as a
-        destination of the topic exchange (``routing_key="#"``) so existing
-        fanout consumers keep receiving every event during the migration to
-        topic-based bindings.
-
-        Called once from ``__init__``. Forces the connection to open and
-        re-raises any broker error so the operator is alerted rather than
-        silently dropping events for legacy consumers — the ``@cache`` on
-        ``get_queue_service`` does not cache exceptions, so a subsequent
-        event will retry construction.
-
-        :raises Exception: Re-raises any broker error from declaring the
-            exchanges or creating the exchange-to-exchange binding.
-        """
-        try:
-            with self.connection.channel() as channel:
-                self.exchange(channel).declare()
-                self.legacy_exchange(channel).declare()
-                self.legacy_exchange(channel).bind_to(
-                    exchange=self.exchange, routing_key="#"
-                )
-        except Exception as exc:
-            logger.error(
-                "Could not bind legacy fanout exchange to topic exchange: %s",
-                exc,
-                exc_info=True,
-            )
-            raise
+    def _open_connections(self) -> list[Connection]:
+        pool = self.connection_pool
+        return [
+            conn
+            for conn in (*pool._dirty, *pool._resource.queue)
+            if not isinstance(conn, lazy)  # Never opened
+        ]
 
     @staticmethod
     def _build_routing_key(payload: dict[str, Any]) -> str:
@@ -149,7 +171,9 @@ class QueueService(BaseQueueService):
             producer.publish(
                 event,
                 exchange=self.exchange,
-                declare=[self.exchange],
+                # Cached per connection by kombu, declared again when `retry`
+                # reconnects, also in the middle of a batch
+                declare=[self.exchange, self.legacy_exchange],
                 routing_key=routing_key,
                 content_type="application/json",
                 content_encoding="utf-8",
@@ -174,7 +198,7 @@ class QueueService(BaseQueueService):
         """
         total = 0
         try:
-            with producers[self.connection].acquire(block=False) as producer:
+            with self.producer_pool.acquire(block=False) as producer:
                 for event, routing_key in events:
                     if not self._try_publish(producer, event, routing_key):
                         break
@@ -239,6 +263,23 @@ class QueueService(BaseQueueService):
     def clear_unsent_events(self) -> None:
         self.unsent_events.clear()
 
+    def close(self) -> None:
+        """
+        Send buffered events, then AMQP close every open connection.
+        ``force_close_all`` alone drops the sockets, and the broker logs them
+        as unexpectedly closed.
+        """
+        with gevent.Timeout(CLOSE_TIMEOUT_SECONDS, False):
+            self.send_unsent_events()
+            for conn in self._open_connections():
+                try:
+                    self.connection_pool.close_resource(conn)
+                except Exception as exc:
+                    logger.warning("Could not close broker connection: %s", exc)
+        if self.unsent_events:
+            logger.warning("Dropping %d unsent events", len(self.unsent_events))
+        self.connection_pool.force_close_all()
+
 
 class MockedQueueService(BaseQueueService):
     """Used when EVENTS_QUEUE_URL is not configured."""
@@ -254,3 +295,11 @@ def get_queue_service() -> BaseQueueService:
         return QueueService()
     logger.warning("MockedQueueService is used")
     return MockedQueueService()
+
+
+def close_queue_service() -> None:
+    """
+    For process exit hooks: close the queue service only if it was built.
+    """
+    if get_queue_service.cache_info().currsize:
+        get_queue_service().close()
