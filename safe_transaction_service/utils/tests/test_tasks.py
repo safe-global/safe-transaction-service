@@ -10,6 +10,7 @@ from ..tasks import (
     ACTIVE_LOCKS,
     WORKER_STOPPED,
     only_one_running_task,
+    worker_shutdown_handler,
     worker_shutting_down_handler,
 )
 
@@ -17,6 +18,11 @@ from ..tasks import (
 class TestTasks(TestCase):
     def test_worker_shutting_down_handler(self):
         worker_shutting_down_handler(None, None, None)
+
+    @mock.patch("safe_transaction_service.utils.tasks.close_queue_service")
+    def test_worker_shutdown_handler(self, close_queue_service_mock):
+        worker_shutdown_handler()
+        close_queue_service_mock.assert_called_once_with()
 
     def test_only_one_running_task(self):
         celery_task = CeleryTask()
