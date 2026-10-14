@@ -7,6 +7,13 @@ on:
   pull_request:
   release:
     types: [ released ]
+
+# A new run cancels the older run of the same ref, so an older commit cannot
+# publish its image over a newer one.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions: {}
 
 jobs:
@@ -114,7 +121,6 @@ jobs:
     needs:
       - linting
       - test-app
-    concurrency: docker-deploy-${{ github.ref }}
     uses: docker/github-builder/.github/workflows/build.yml@58cb9f5b71b1836d6f690c1e95effdeb9b98cb8a # v1.17.0
     permissions:
       contents: read
