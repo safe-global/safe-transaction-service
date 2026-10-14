@@ -5,8 +5,10 @@ from unittest import mock
 from django.conf import settings
 from django.test import SimpleTestCase, TestCase, override_settings
 
+import gevent
 from kombu import Connection, Exchange, Queue
 from kombu.exceptions import LimitExceeded
+from kombu.pools import get_limit
 
 from ..services import queue_service as queue_service_module
 from ..services.queue_service import (
@@ -246,6 +248,12 @@ class TestQueueService(TestCase):
         producer_2.release()
         self.assertEqual(len(queue_service._open_connections()), 2)
 
+    @override_settings(EVENTS_QUEUE_POOL_CONNECTIONS_LIMIT=0)
+    def test_pool_limit_zero_uses_kombu_default(self):
+        queue_service = self._make_queue_service()
+        self.assertEqual(queue_service.connection_pool.limit, get_limit())
+        self.assertEqual(queue_service.producer_pool.limit, get_limit())
+
     def test_connection_name(self):
         queue_service = self._make_queue_service()
         queue_service.send_event({"message": "named"})
@@ -268,9 +276,22 @@ class TestQueueService(TestCase):
         self.assertEqual(self._get_message(), {"message": "buffered"})
 
         queue_service.close()
-        self.assertEqual(queue_service.send_event({"message": "2"}), 0)
-        with self.assertLogs(queue_service_module.logger, level="WARNING") as logs:
-            queue_service.close()
+        self.assertEqual(queue_service.send_event({"message": "after close"}), 1)
+        self.assertEqual(self._get_message(), {"message": "after close"})
+        queue_service.close()
+
+    @mock.patch.object(queue_service_module, "CLOSE_TIMEOUT_SECONDS", 0.1)
+    def test_close_timeout_keeps_unsent_events(self):
+        queue_service = self._make_queue_service()
+        with mock.patch.object(QueueService, "_try_publish", return_value=False):
+            queue_service.send_event({"message": "buffered"})
+
+        with mock.patch.object(
+            QueueService, "_publish_events", side_effect=lambda events: gevent.sleep(1)
+        ):
+            with self.assertLogs(queue_service_module.logger, level="WARNING") as logs:
+                queue_service.close()
+        self.assertEqual(len(queue_service.unsent_events), 1)
         self.assertIn("Dropping 1 unsent events", logs.output[-1])
 
 

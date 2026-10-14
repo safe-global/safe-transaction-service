@@ -12,7 +12,7 @@ import gevent
 import orjson
 from kombu import Connection, Exchange, Producer
 from kombu.connection import ConnectionPool
-from kombu.pools import ProducerPool
+from kombu.pools import ProducerPool, get_limit
 from kombu.transport.base import StdChannel
 from kombu.utils.functional import lazy
 
@@ -124,8 +124,8 @@ class QueueService(BaseQueueService):
             },
         )
         # Not the global `kombu.pools`: its connection pool ignores the producer
-        # pool limit
-        limit = settings.EVENTS_QUEUE_POOL_CONNECTIONS_LIMIT
+        # pool limit. A 0 limit disables pooling in kombu, so use its default
+        limit = settings.EVENTS_QUEUE_POOL_CONNECTIONS_LIMIT or get_limit()
         self.connection_pool: ConnectionPool = connection.Pool(limit=limit)
         self.producer_pool: ProducerPool = ProducerPool(
             self.connection_pool, limit=limit
@@ -250,9 +250,13 @@ class QueueService(BaseQueueService):
         unsent = self.unsent_events
         self.unsent_events = []
         logger.info("Sending %d previously unsent messages", len(unsent))
-        total = self._publish_events(unsent)
-        if total != len(unsent):
+        total = 0
+        try:
+            total = self._publish_events(unsent)
+        finally:
+            # Also on `gevent.Timeout`, which is not an `Exception`
             self.unsent_events.extend(unsent[total:])
+        if total != len(unsent):
             logger.info(
                 "Sent %d / %d unsent messages before failure", total, len(unsent)
             )
@@ -278,7 +282,10 @@ class QueueService(BaseQueueService):
                     logger.warning("Could not close broker connection: %s", exc)
         if self.unsent_events:
             logger.warning("Dropping %d unsent events", len(self.unsent_events))
-        self.connection_pool.force_close_all()
+        # The cached service stays usable: a later publish opens a new connection.
+        # `setup` refills the pool, without it the next acquire blocks forever
+        self.connection_pool.force_close_all(close_pool=False)
+        self.connection_pool.setup()
 
 
 class MockedQueueService(BaseQueueService):
