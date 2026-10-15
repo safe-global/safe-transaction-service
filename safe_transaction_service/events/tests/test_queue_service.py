@@ -215,6 +215,18 @@ class TestQueueService(TestCase):
         self.assertEqual(self._get_message(), {"message": "after 1"})
         self.assertEqual(self._get_message(), {"message": "after 2"})
 
+    def test_publish_retry_is_logged(self):
+        queue_service = self._make_queue_service()
+        queue_service.send_event({"message": "before"})
+        self.assertEqual(self._get_message(), {"message": "before"})
+
+        (conn,) = queue_service._open_connections()
+        conn.connection.transport.sock.close()
+        with self.assertLogs(queue_service_module.logger, level="WARNING") as logs:
+            self.assertEqual(queue_service.send_event({"message": "after"}), 1)
+        self.assertIn("Broker error while publishing, retrying", logs.output[0])
+        self.assertEqual(self._get_message(), {"message": "after"})
+
     def test_legacy_binding_declared_once_per_connection(self):
         queue_service = self._make_queue_service()
         with self._spy_bind_to() as bind_to_mock:
