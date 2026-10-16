@@ -224,8 +224,27 @@ class TestQueueService(TestCase):
         conn.connection.transport.sock.close()
         with self.assertLogs(queue_service_module.logger, level="WARNING") as logs:
             self.assertEqual(queue_service.send_event({"message": "after"}), 1)
-        self.assertIn("Broker error while publishing, retrying", logs.output[0])
+        self.assertEqual(len(logs.output), 1)
+        self.assertIn("Broker error, retrying", logs.output[0])
         self.assertEqual(self._get_message(), {"message": "after"})
+
+    def test_publish_retry_with_unreachable_broker(self):
+        queue_service = self._make_queue_service()
+        queue_service.send_event({"message": "before"})
+        self.assertEqual(self._get_message(), {"message": "before"})
+
+        (conn,) = queue_service._open_connections()
+        conn.port = 1  # Reconnect is refused
+        conn.connection.transport.sock.close()
+        with self.assertLogs(queue_service_module.logger, level="WARNING") as logs:
+            self.assertEqual(queue_service.send_event({"message": "buffered"}), 0)
+        # Publish error, failed reconnect attempt, then the publish gives up
+        self.assertEqual(len(logs.output), 3)
+        self.assertIn("Broker error, retrying", logs.output[0])
+        self.assertIn("Broker error, retrying", logs.output[1])
+        self.assertIn("ConnectionRefusedError", logs.output[1])
+        self.assertIn("Failed to publish event", logs.output[2])
+        self.assertEqual(len(queue_service.unsent_events), 1)
 
     def test_legacy_binding_declared_once_per_connection(self):
         queue_service = self._make_queue_service()

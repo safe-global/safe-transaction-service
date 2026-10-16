@@ -165,17 +165,15 @@ class QueueService(BaseQueueService):
     @staticmethod
     def _log_publish_retry(exc: Exception, interval: float) -> None:
         """
-        Called by kombu when a publish fails with a connection or channel
-        error, before it retries. On a connection error kombu drops the socket
-        without an AMQP close and the retry usually works, so this is the only
-        trace of the error.
+        Called by kombu before each retry: once for the publish error and once
+        per failed reconnect attempt. On a connection error kombu drops the
+        socket without an AMQP close and the retry usually works, so this is
+        the only trace of the error.
 
         :param exc: Error that made kombu retry
         :param interval: Seconds kombu waits before the retry
         """
-        logger.warning(
-            "Broker error while publishing, retrying in %ss: %r", interval, exc
-        )
+        logger.warning("Broker error, retrying in %ss: %r", interval, exc)
 
     def _try_publish(self, producer: Producer, event: bytes, routing_key: str) -> bool:
         """
