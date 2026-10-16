@@ -162,6 +162,19 @@ class QueueService(BaseQueueService):
         address_part = address.lower() if address else "_"
         return f"{chain_id}.{event_type}.{address_part}"
 
+    @staticmethod
+    def _log_publish_retry(exc: Exception, interval: float) -> None:
+        """
+        Called by kombu before each retry: once for the publish error and once
+        per failed reconnect attempt. On a connection error kombu drops the
+        socket without an AMQP close and the retry usually works, so this is
+        the only trace of the error.
+
+        :param exc: Error that made kombu retry
+        :param interval: Seconds kombu waits before the retry
+        """
+        logger.warning("Broker error, retrying in %ss: %r", interval, exc)
+
     def _try_publish(self, producer: Producer, event: bytes, routing_key: str) -> bool:
         """
         Attempt to publish one pre-serialized JSON event with the given
@@ -179,7 +192,11 @@ class QueueService(BaseQueueService):
                 content_encoding="utf-8",
                 app_id=EVENTS_APP_ID,
                 retry=True,
-                retry_policy={"max_retries": 1, "interval_start": 0},
+                retry_policy={
+                    "max_retries": 1,
+                    "interval_start": 0,
+                    "errback": self._log_publish_retry,
+                },
                 serializer="raw",
             )
             logger.debug("Event sent with routing_key=%s: %s", routing_key, event)
