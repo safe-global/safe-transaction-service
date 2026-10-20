@@ -319,6 +319,11 @@ CELERY_TASK_ROUTES = (
             "safe_transaction_service.history.tasks.process_decoded_internal_txs_task",
             {"queue": "processing", "delivery_mode": "transient"},
         ),
+        # Short and frequent task, kept apart from the long indexing tasks
+        (
+            "safe_transaction_service.history.tasks.sync_from_queue_service_task",
+            {"queue": "contracts", "delivery_mode": "transient"},
+        ),
         (
             "safe_transaction_service.history.tasks.*",
             {"queue": "indexing", "delivery_mode": "transient"},
@@ -725,6 +730,11 @@ EVENTS_QUEUE_TOPIC_EXCHANGE_NAME = env(
 EVENTS_QUEUE_POOL_CONNECTIONS_LIMIT = env.int(
     "EVENTS_QUEUE_POOL_CONNECTIONS_LIMIT", default=20
 )
+
+# Queue Service
+# ------------------------------------------------------------------------------
+# When set, the data written to the Queue Service is copied into this service
+QUEUE_SERVICE_URL = env.str("QUEUE_SERVICE_URL", default=None)
 
 # Events
 # ------------------------------------------------------------------------------

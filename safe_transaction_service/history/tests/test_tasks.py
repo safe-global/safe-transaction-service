@@ -36,6 +36,7 @@ from ..services import (
 )
 from ..services.collectibles_service import CollectibleWithMetadata
 from ..services.index_service import SpecificIndexingStatus
+from ..services.queue_service_sync_service import QUEUE_SERVICE_SYNC_INTERVAL_SECONDS
 from ..tasks import (
     check_reorgs_task,
     check_sync_status_task,
@@ -51,6 +52,7 @@ from ..tasks import (
     reindex_mastercopies_last_hours_task,
     remove_not_trusted_multisig_txs_task,
     retry_get_metadata_task,
+    sync_from_queue_service_task,
 )
 from ..tasks import logger as task_logger
 from .factories import (
@@ -471,4 +473,20 @@ class TestTasks(TestCase):
                 delegate=safe_contract_delegate_expected_to_be_deleted.delegate,
                 delegator=safe_contract_delegate_expected_to_be_deleted.delegator,
             ).exists()
+        )
+
+    @patch("safe_transaction_service.history.tasks.get_queue_service_sync_service")
+    def test_sync_from_queue_service_task(
+        self, get_queue_service_sync_service_mock: MagicMock
+    ):
+        sync_mock = get_queue_service_sync_service_mock.return_value.sync
+        sync_mock.return_value = 3
+        # Disabled
+        self.assertIsNone(sync_from_queue_service_task.delay().result)
+        sync_mock.assert_not_called()
+
+        with self.settings(QUEUE_SERVICE_URL="http://queue-service"):
+            self.assertEqual(sync_from_queue_service_task.delay().result, 3)
+        sync_mock.assert_called_once_with(
+            time_limit_seconds=QUEUE_SERVICE_SYNC_INTERVAL_SECONDS - 1
         )
