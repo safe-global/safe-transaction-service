@@ -15,6 +15,7 @@ from safe_eth.eth import EthereumClient, get_auto_ethereum_client
 from safe_eth.eth.utils import fast_to_checksum_address
 from safe_eth.util.util import to_0x_hex_str
 
+from ..cache import CacheSafeTxsView, remove_cache_view_for_addresses
 from ..models import (
     EthereumBlock,
     EthereumTx,
@@ -430,7 +431,7 @@ class IndexService:
 
         Transactions created by the indexer are deleted. Transactions proposed by
         users are unlinked from their ethereum tx. Rows are changed without Django
-        signals, so no events are sent.
+        signals, so no events are sent. The view cache of the Safe is removed.
 
         :param address: Safe to reset
         :param timestamp: Only reset transactions executed on or after `timestamp`
@@ -486,6 +487,11 @@ class IndexService:
             unlinked_txs,
             deleted_confirmations,
         )
+        # Rows were changed without Django signals, so the view cache must be
+        # removed here
+        remove_cache_view_for_addresses(
+            CacheSafeTxsView.LIST_MULTISIGTRANSACTIONS_VIEW_CACHE_KEY, [address]
+        )
 
     @transaction.atomic
     def fix_out_of_order(
@@ -511,7 +517,10 @@ class IndexService:
             tx_hash_hex,
             timestamp,
         )
-        self._reset_executed_multisig_txs(address, timestamp)
+        # On L2 the nonce of an execution comes from the Safe events, so it does not
+        # depend on the processing order
+        if not self.eth_l2_network:
+            self._reset_executed_multisig_txs(address, timestamp)
         logger.info(
             "[%s] Marking InternalTxDecoded newer than timestamp as not processed",
             address,

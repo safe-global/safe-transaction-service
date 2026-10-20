@@ -12,6 +12,7 @@ from safe_eth.eth import EthereumClient
 from safe_eth.eth.tests.ethereum_test_case import EthereumTestCaseMixin
 from safe_eth.eth.utils import fast_keccak_text
 
+from ..cache import CacheSafeTxsView
 from ..models import (
     EthereumTx,
     IndexingStatus,
@@ -292,13 +293,22 @@ class TestIndexService(EthereumTestCaseMixin, TestCase):
         self.assertEqual(MultisigConfirmation.objects.count(), 5)
         self.assertEqual(SafeStatus.objects.count(), 5)
 
-        with mock.patch(
-            "safe_transaction_service.history.signals._process_event"
-        ) as process_event_mock:
+        with (
+            mock.patch(
+                "safe_transaction_service.history.signals._process_event"
+            ) as process_event_mock,
+            mock.patch(
+                "safe_transaction_service.history.services.index_service.remove_cache_view_for_addresses"
+            ) as remove_cache_view_for_addresses_mock,
+        ):
             self.assertIsNone(
                 index_service.fix_out_of_order(safe_address, safe_status_3.internal_tx)
             )
             process_event_mock.assert_not_called()
+            remove_cache_view_for_addresses_mock.assert_called_once_with(
+                CacheSafeTxsView.LIST_MULTISIGTRANSACTIONS_VIEW_CACHE_KEY,
+                [safe_address],
+            )
 
         self.assertEqual(SafeStatus.objects.count(), 3)
         self.assertEqual(SafeLastStatus.objects.count(), 0)
@@ -341,6 +351,32 @@ class TestIndexService(EthereumTestCaseMixin, TestCase):
             api_approve_hash_confirmation.multisig_transaction_id,
             multisig_tx_api.safe_tx_hash,
         )
+
+    def test_fix_out_of_order_l2(self):
+        """
+        On L2 the nonce comes from the Safe events, so executed multisig
+        transactions are not reset
+        """
+        index_service: IndexService = self.index_service
+        safe_status = SafeStatusFactory()
+        safe_address = safe_status.address
+        SafeLastStatus.objects.get_or_generate(safe_address)
+        after = safe_status.internal_tx.timestamp + datetime.timedelta(minutes=1)
+        multisig_tx_indexer = MultisigTransactionFactory(
+            safe=safe_address, origin={}, ethereum_tx__block__timestamp=after
+        )
+        multisig_tx_api = MultisigTransactionFactory(
+            safe=safe_address, ethereum_tx__block__timestamp=after
+        )
+
+        with mock.patch.object(index_service, "eth_l2_network", True):
+            index_service.fix_out_of_order(safe_address, safe_status.internal_tx)
+
+        self.assertEqual(SafeStatus.objects.count(), 0)
+        self.assertEqual(SafeLastStatus.objects.count(), 0)
+        for multisig_tx in (multisig_tx_indexer, multisig_tx_api):
+            multisig_tx.refresh_from_db()
+            self.assertIsNotNone(multisig_tx.ethereum_tx_id)
 
     def test_fix_out_of_order_late_exec_transaction(self):
         """
