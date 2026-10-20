@@ -147,7 +147,7 @@ def build_delegate_event(
 class TestQueueServiceSyncService(TestCase):
     def setUp(self):
         self.queue_service_client = MagicMock(spec=QueueServiceClient)
-        self.queue_service_client.get_delegates.return_value = []
+        self.set_queue_service_delegates()
         self.connection = Connection(settings.EVENTS_QUEUE_URL)
         self.sync_service = QueueServiceSyncService(
             self.queue_service_client, self.connection, CHAIN_ID
@@ -461,12 +461,32 @@ class TestQueueServiceSyncService(TestCase):
         self.assertEqual(safe_message.modified.isoformat(), "2099-01-01T00:00:00+00:00")
         self.assertEqual(safe_message.confirmations.count(), 1)
 
+    def set_queue_service_delegates(self, *delegate_events: dict[str, Any]):
+        """
+        Current delegates in the Queue Service, built from the events that
+        created them
+        """
+        self.queue_service_client.get_delegates.side_effect = (
+            lambda delegate, delegator: [
+                {
+                    "delegate": event["delegate"],
+                    "delegator": event["delegator"],
+                    "chainId": None if event["chainId"] == "0" else event["chainId"],
+                    "safe": event["address"],
+                    "label": event["label"],
+                }
+                for event in delegate_events
+                if event["delegate"] == delegate and event["delegator"] == delegator
+            ]
+        )
+
     def test_sync_delegate(self):
         safe_contract = SafeContractFactory()
         event = build_delegate_event(address=safe_contract.address)
-        self.publish(event)
         # Delegate for every Safe and every chain
         all_safes_event = build_delegate_event(chain_id="0")
+        self.set_queue_service_delegates(event, all_safes_event)
+        self.publish(event)
         self.publish(all_safes_event)
         # Delegate for another chain, not bound to the queue
         self.publish(build_delegate_event(chain_id="100"))
@@ -486,8 +506,9 @@ class TestQueueServiceSyncService(TestCase):
         self.assertEqual(all_safes_delegate.delegate, all_safes_event["delegate"])
 
         # Update and delete, also for every Safe
-        self.publish(event | {"type": "UPDATED_DELEGATE", "label": "Updated"})
-        self.publish(all_safes_event | {"type": "UPDATED_DELEGATE", "label": "Updated"})
+        event["label"] = all_safes_event["label"] = "Updated"
+        self.publish(event | {"type": "UPDATED_DELEGATE"})
+        self.publish(all_safes_event | {"type": "UPDATED_DELEGATE"})
         self.assertEqual(self.sync_without_events(), 2)
         self.assertEqual(SafeContractDelegate.objects.count(), 2)
         self.assertEqual(
@@ -495,10 +516,24 @@ class TestQueueServiceSyncService(TestCase):
             {"Updated"},
         )
 
+        self.set_queue_service_delegates()
         self.publish(event | {"type": "DELETED_DELEGATE", "label": ""})
         self.publish(all_safes_event | {"type": "DELETED_DELEGATE", "label": ""})
         self.assertEqual(self.sync_without_events(), 2)
         self.assertFalse(SafeContractDelegate.objects.exists())
+
+    def test_sync_delegate_stale_event(self):
+        # A create event processed after the delegate was deleted does not
+        # create it again
+        event = build_delegate_event()
+        self.set_queue_service_delegates()
+        self.sync_service.sync_delegate(event)
+        self.assertFalse(SafeContractDelegate.objects.exists())
+
+        # An old update does not restore an old label
+        self.set_queue_service_delegates(event | {"label": "Current"})
+        self.sync_service.sync_delegate(event | {"type": "UPDATED_DELEGATE"})
+        self.assertEqual(SafeContractDelegate.objects.get().label, "Current")
 
     def test_sync_deleted_delegate_keeps_other_scopes(self):
         delegate = SafeContractDelegateFactory()
@@ -507,7 +542,8 @@ class TestQueueServiceSyncService(TestCase):
             delegate=delegate.delegate,
             delegator=delegate.delegator,
         )
-        self.sync_service.sync_deleted_delegate(
+        self.set_queue_service_delegates()
+        self.sync_service.sync_delegate(
             build_delegate_event(
                 event_type="DELETED_DELEGATE",
                 address=delegate.safe_contract_id,
@@ -522,30 +558,30 @@ class TestQueueServiceSyncService(TestCase):
 
     def test_sync_deleted_delegate_still_valid_for_this_chain(self):
         # Delegates for every chain and for this chain are the same row here
-        delegate = SafeContractDelegateFactory(safe_contract=None)
-        self.queue_service_client.get_delegates.return_value = [
-            {
-                "delegate": delegate.delegate,
-                "delegator": delegate.delegator,
-                "chainId": CHAIN_ID,
-                "safe": None,
-                "label": delegate.label,
-            }
-        ]
-        event = build_delegate_event(
-            event_type="DELETED_DELEGATE",
+        chain_event = build_delegate_event(label="This chain")
+        all_chains_event = build_delegate_event(
             chain_id="0",
-            delegate=delegate.delegate,
-            delegator=delegate.delegator,
+            delegate=chain_event["delegate"],
+            delegator=chain_event["delegator"],
+            label="Every chain",
         )
-        self.sync_service.sync_deleted_delegate(event)
-        self.assertTrue(SafeContractDelegate.objects.exists())
-        self.queue_service_client.get_delegates.assert_called_once_with(
-            delegate.delegate, delegate.delegator
-        )
+        self.set_queue_service_delegates(chain_event, all_chains_event)
+        self.sync_service.sync_delegate(all_chains_event)
+        # The delegate of this chain is used
+        self.assertEqual(SafeContractDelegate.objects.get().label, "This chain")
 
-        self.queue_service_client.get_delegates.return_value = []
-        self.sync_service.sync_deleted_delegate(event)
+        # Deleted for this chain, the one for every chain is kept
+        self.set_queue_service_delegates(all_chains_event)
+        self.sync_service.sync_delegate(
+            chain_event | {"type": "DELETED_DELEGATE", "label": ""}
+        )
+        self.assertEqual(SafeContractDelegate.objects.get().label, "Every chain")
+
+        # Delegates of other chains do not keep it
+        self.set_queue_service_delegates(chain_event | {"chainId": "100"})
+        self.sync_service.sync_delegate(
+            all_chains_event | {"type": "DELETED_DELEGATE", "label": ""}
+        )
         self.assertFalse(SafeContractDelegate.objects.exists())
 
     def test_sync_ignores_events_not_from_queue_service(self):
@@ -649,3 +685,22 @@ class TestQueueServiceClient(TestCase):
             get_mock.return_value.raise_for_status.side_effect = requests.HTTPError()
             with self.assertRaises(requests.HTTPError):
                 client.get_message(safe_tx_hash)
+
+    def test_get_delegates(self):
+        client = QueueServiceClient("http://queue-service")
+        with mock.patch.object(client.http_session, "get") as get_mock:
+            get_mock.return_value.status_code = 200
+            get_mock.return_value.json.side_effect = [
+                {"next": "http://queue-service/next", "results": [{"label": "1"}]},
+                {"next": None, "results": [{"label": "2"}]},
+            ]
+            self.assertEqual(
+                client.get_delegates("0x1", "0x2"), [{"label": "1"}, {"label": "2"}]
+            )
+            self.assertEqual(
+                [call.args[0] for call in get_mock.call_args_list],
+                [
+                    "http://queue-service/api/v1/delegates?delegate=0x1&delegator=0x2&offset=0&limit=100",
+                    "http://queue-service/api/v1/delegates?delegate=0x1&delegator=0x2&offset=1&limit=100",
+                ],
+            )

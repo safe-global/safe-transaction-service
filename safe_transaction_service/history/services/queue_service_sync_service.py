@@ -9,7 +9,6 @@ no event is published: the Queue Service already published its own. Cached views
 are cleared explicitly instead.
 """
 
-import datetime
 import json
 import logging
 import time
@@ -20,7 +19,7 @@ from typing import Any
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import DataError, IntegrityError, transaction
-from django.db.models import QuerySet, Value
+from django.db.models import Value
 from django.db.models.functions import Greatest
 from django.utils.dateparse import parse_datetime
 
@@ -55,6 +54,8 @@ QUEUE_SERVICE_APP_ID = "safe-queue-service"
 # Delegates valid for every chain are published with this `chainId`
 ALL_CHAINS_CHAIN_ID = "0"
 DELEGATE_EVENT_TYPES = ("NEW_DELEGATE", "UPDATED_DELEGATE", "DELETED_DELEGATE")
+
+DELEGATES_PAGE_SIZE = 100
 
 # Proposal route of the Queue Service when a delegate proposed the transaction
 PROPOSED_VIA_DELEGATE = "DELEGATE"
@@ -100,9 +101,21 @@ class QueueServiceClient(BaseHTTPClient):
         return self._get(f"/api/v1/messages/{message_hash}")
 
     def get_delegates(self, delegate: str, delegator: str) -> list[dict[str, Any]]:
-        return self._get(
-            f"/api/v1/delegates?delegate={delegate}&delegator={delegator}"
-        )["results"]
+        """
+        :return: Every delegation of the delegator to the delegate, for every
+            Safe and chain
+        """
+        delegates = []
+        offset = 0
+        while True:
+            response = self._get(
+                f"/api/v1/delegates?delegate={delegate}&delegator={delegator}"
+                f"&offset={offset}&limit={DELEGATES_PAGE_SIZE}"
+            )
+            delegates.extend(response["results"])
+            if not response["next"] or not response["results"]:
+                return delegates
+            offset += len(response["results"])
 
 
 class SkippedEventException(Exception):
@@ -159,7 +172,7 @@ class QueueServiceSyncService:
             "MESSAGE_CONFIRMATION": self.sync_message,
             "NEW_DELEGATE": self.sync_delegate,
             "UPDATED_DELEGATE": self.sync_delegate,
-            "DELETED_DELEGATE": self.sync_deleted_delegate,
+            "DELETED_DELEGATE": self.sync_delegate,
         }
         # The bindings select the events: every event of this chain, and the
         # delegates valid for every chain
@@ -460,69 +473,57 @@ class QueueServiceSyncService:
                 )
             )
 
-    def _get_delegates_queryset(self, payload: dict[str, Any]) -> QuerySet:
+    def sync_delegate(self, payload: dict[str, Any]) -> None:
         """
-        :param payload: Delegate event
-        :return: Queryset with the delegate of the event
+        Set the delegate of the event to its current state in the Queue Service.
+        This service has no chain for delegates: a delegate valid for every
+        chain and one valid for this chain are the same row, which exists while
+        one of them exists in the Queue Service. The Queue Service does not store
+        an expiry date.
+
+        :param payload: ``NEW_DELEGATE``, ``UPDATED_DELEGATE`` or
+            ``DELETED_DELEGATE`` event
         :raises SkippedEventException: if the Safe of the delegate is not indexed
         """
         safe = payload.get("address")
         if safe and not SafeContract.objects.filter(address=safe).exists():
             raise SkippedEventException(f"Safe {safe} is not indexed")
-        return SafeContractDelegate.objects.filter(
+
+        current_delegates = [
+            delegate
+            for delegate in self.queue_service_client.get_delegates(
+                payload["delegate"], payload["delegator"]
+            )
+            if (delegate["safe"] and fast_to_checksum_address(delegate["safe"])) == safe
+            and (
+                delegate["chainId"] is None or str(delegate["chainId"]) == self.chain_id
+            )
+        ]
+        queryset = SafeContractDelegate.objects.filter(
             safe_contract_id=safe,
             delegate=payload["delegate"],
             delegator=payload["delegator"],
         )
+        if not current_delegates:
+            # `delete()` would send `post_delete` and publish an event
+            _raw_delete(queryset)
+            return None
 
-    def sync_delegate(self, payload: dict[str, Any]) -> None:
-        """
-        Create or update the delegate of the event.
-
-        :param payload: ``NEW_DELEGATE`` or ``UPDATED_DELEGATE`` event
-        """
-        queryset = self._get_delegates_queryset(payload)
-        expiry_date_seconds = payload.get("expiryDateSeconds")
-        fields = {
-            "label": payload["label"],
-            "expiry_date": (
-                datetime.datetime.fromtimestamp(expiry_date_seconds, datetime.UTC)
-                if expiry_date_seconds
-                else None
-            ),
-        }
+        # The delegate of this chain is more specific than the one for every chain
+        current_delegate = min(
+            current_delegates, key=lambda delegate: delegate["chainId"] is None
+        )
+        fields = {"label": current_delegate["label"] or "", "expiry_date": None}
         # `update_or_create` would send `post_save`. A unique index with a null
         # `safe_contract` never conflicts, so `bulk_create` cannot upsert
         if not queryset.update(**fields):
             SafeContractDelegate.objects.bulk_create(
                 [
                     SafeContractDelegate(
-                        safe_contract_id=payload.get("address"),
+                        safe_contract_id=safe,
                         delegate=payload["delegate"],
                         delegator=payload["delegator"],
                         **fields,
                     )
                 ]
             )
-
-    def sync_deleted_delegate(self, payload: dict[str, Any]) -> None:
-        """
-        Delete the delegate of the event.
-
-        :param payload: ``DELETED_DELEGATE`` event
-        """
-        queryset = self._get_delegates_queryset(payload)
-        # This service has no chain for delegates: a delegate valid for every
-        # chain and one valid for this chain are the same row, so it is kept
-        # while one of them is still in the Queue Service
-        safe = payload.get("address")
-        if any(
-            delegate["safe"] == safe
-            and delegate["chainId"] in (None, self.chain_id, int(self.chain_id))
-            for delegate in self.queue_service_client.get_delegates(
-                payload["delegate"], payload["delegator"]
-            )
-        ):
-            return None
-        # `delete()` would send `post_delete` and publish an event
-        _raw_delete(queryset)
