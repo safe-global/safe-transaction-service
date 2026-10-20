@@ -1606,6 +1606,20 @@ class MultisigTransactionQuerySet(models.QuerySet):
     def not_executed(self):
         return self.filter(ethereum_tx=None)
 
+    def transactions_via_indexer(self):
+        """
+        :return: Transactions created by the indexer, with no origin and no proposer.
+            They hold no user data, so they can be recreated from the blockchain
+        """
+        return self.filter(origin__exact={}, proposer=None)
+
+    def transactions_via_api(self):
+        """
+        :return: Transactions proposed by users using the API. The API stores an
+            empty origin if none is provided, so the proposer is also checked
+        """
+        return self.exclude(origin__exact={}, proposer=None)
+
     def with_data(self):
         return self.exclude(data=None)
 

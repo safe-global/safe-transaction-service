@@ -17,9 +17,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         file_name = options["file_name"]
 
-        queryset = MultisigTransaction.objects.exclude(origin__exact={}).exclude(
-            ethereum_tx=None
-        )
+        queryset = MultisigTransaction.objects.executed().transactions_via_api()
         count = queryset.count()
         self.stdout.write(
             self.style.SUCCESS(
