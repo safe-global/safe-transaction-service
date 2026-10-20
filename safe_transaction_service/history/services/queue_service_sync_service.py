@@ -67,6 +67,9 @@ QUEUE_TTL_MS = 24 * 60 * 60 * 1000
 # How often the sync task runs
 QUEUE_SERVICE_SYNC_INTERVAL_SECONDS = 5
 
+# HTTP status codes of the Queue Service while it is restarted or deployed
+QUEUE_SERVICE_UNAVAILABLE_STATUS_CODES = (502, 503, 504)
+
 # Log message for events that cannot be stored, used for a log-based metric
 SKIPPED_EVENT_LOG_MESSAGE = "Queue Service sync skipped event"
 
@@ -205,7 +208,8 @@ class QueueServiceSyncService:
         limit is reached, or the Queue Service cannot be reached.
 
         :param time_limit_seconds: Stop taking new events after this time
-        :return: Number of events processed
+        :return: Number of messages consumed, including the ones from other
+            publishers, which are ignored
         """
         deadline = time.monotonic() + time_limit_seconds
         processed = 0
@@ -249,7 +253,9 @@ class QueueServiceSyncService:
             payload = json.loads(message.body)
             with transaction.atomic():
                 self.event_handlers[payload["type"]](payload)
-        except (requests.ConnectionError, requests.Timeout) as exc:
+        except requests.RequestException as exc:
+            if not self._is_queue_service_unavailable(exc):
+                return self._retry_once(message, payload, exc)
             logger.warning(
                 "Queue Service cannot be reached, requeueing event %s: %s",
                 payload,
@@ -268,22 +274,53 @@ class QueueServiceSyncService:
         ) as exc:
             self._log_skipped_event(payload, repr(exc))
         except Exception as exc:
-            if message.delivery_info.get("redelivered"):
-                self._log_skipped_event(payload, repr(exc))
-            else:
-                logger.warning(
-                    "Cannot process event %s, requeueing it", payload, exc_info=True
-                )
-                message.requeue()
-                return False
+            return self._retry_once(message, payload, exc)
         message.ack()
         return True
+
+    @staticmethod
+    def _is_queue_service_unavailable(exc: requests.RequestException) -> bool:
+        return isinstance(exc, (requests.ConnectionError, requests.Timeout)) or (
+            exc.response is not None
+            and exc.response.status_code in QUEUE_SERVICE_UNAVAILABLE_STATUS_CODES
+        )
+
+    def _retry_once(
+        self, message: Message, payload: dict[str, Any] | str, exc: Exception
+    ) -> bool:
+        """
+        Requeue the message, or drop it if it was already redelivered.
+
+        :return: ``False`` if the sync must stop for this run, ``True`` otherwise
+        """
+        if message.delivery_info.get("redelivered"):
+            self._log_skipped_event(payload, repr(exc))
+            message.ack()
+            return True
+        logger.warning("Cannot process event %s, requeueing it", payload, exc_info=True)
+        message.requeue()
+        return False
 
     def _log_skipped_event(self, payload: dict[str, Any] | str, reason: str) -> None:
         logger.warning(
             SKIPPED_EVENT_LOG_MESSAGE,
             extra={"extra_data": {"event": payload, "reason": reason}},
         )
+
+    def _filter_this_chain(
+        self, element_data: dict[str, Any] | None
+    ) -> dict[str, Any] | None:
+        """
+        Safes older than v1.3.0 build the same hash on every chain, and the
+        Queue Service stores one element per hash, so an element of another
+        chain is missing for this one.
+
+        :param element_data: Transaction or message from the Queue Service
+        :return: ``element_data`` if it belongs to this chain, ``None`` otherwise
+        """
+        if element_data is None or str(element_data["chainId"]) != self.chain_id:
+            return None
+        return element_data
 
     def _remove_multisig_transactions_cache(self, safe: str) -> None:
         if settings.CACHE_VIEW_DEFAULT_TIMEOUT:
@@ -299,8 +336,8 @@ class QueueServiceSyncService:
 
         :param payload: ``PENDING_MULTISIG_TRANSACTION`` or ``NEW_CONFIRMATION`` event
         """
-        tx_data = self.queue_service_client.get_multisig_transaction(
-            payload["safeTxHash"]
+        tx_data = self._filter_this_chain(
+            self.queue_service_client.get_multisig_transaction(payload["safeTxHash"])
         )
         # Executed transactions are stored by the indexer
         if tx_data is None or tx_data["txHash"]:
@@ -309,7 +346,7 @@ class QueueServiceSyncService:
         safe_tx_hash = HexBytes(tx_data["safeTxHash"])
         existing_tx = (
             MultisigTransaction.objects.filter(safe_tx_hash=safe_tx_hash)
-            .values("ethereum_tx_id")
+            .values("ethereum_tx_id", "trusted")
             .first()
         )
         if existing_tx and existing_tx["ethereum_tx_id"]:
@@ -329,7 +366,7 @@ class QueueServiceSyncService:
                         ),
                         to=tx_data["to"] or NULL_ADDRESS,
                         value=int(tx_data["value"]),
-                        data=HexBytes(tx_data["data"]) if tx_data["data"] else None,
+                        data=HexBytes(tx_data["data"] or b"") or None,
                         operation=tx_data["operation"],
                         safe_tx_gas=int(tx_data["safeTxGas"]),
                         base_gas=int(tx_data["baseGas"]),
@@ -374,23 +411,25 @@ class QueueServiceSyncService:
             MultisigConfirmation.objects.bulk_create(
                 new_confirmations, ignore_conflicts=True
             )
-            if existing_tx:
-                # A new confirmation makes the transaction trusted and sets
-                # `modified`, same as a confirmation sent to this service
-                MultisigTransaction.objects.filter(safe_tx_hash=safe_tx_hash).update(
-                    trusted=True,
-                    modified=Greatest(
-                        "modified",
-                        Value(
-                            max(
-                                confirmation.created
-                                for confirmation in new_confirmations
-                            )
-                        ),
+
+        # The Queue Service only holds valid proposals, so the transaction is
+        # trusted. A new confirmation also sets `modified`, same as a
+        # confirmation sent to this service
+        updated_tx = not existing_tx or not existing_tx["trusted"] or new_confirmations
+        if existing_tx and updated_tx:
+            fields = {"trusted": True}
+            if new_confirmations:
+                fields["modified"] = Greatest(
+                    "modified",
+                    Value(
+                        max(confirmation.created for confirmation in new_confirmations)
                     ),
                 )
+            MultisigTransaction.objects.filter(safe_tx_hash=safe_tx_hash).update(
+                **fields
+            )
 
-        if not existing_tx or new_confirmations:
+        if updated_tx:
             self._remove_multisig_transactions_cache(tx_data["safe"])
 
     def sync_deleted_multisig_transaction(self, payload: dict[str, Any]) -> None:
@@ -400,7 +439,9 @@ class QueueServiceSyncService:
 
         :param payload: ``DELETED_MULTISIG_TRANSACTION`` event
         """
-        if self.queue_service_client.get_multisig_transaction(payload["safeTxHash"]):
+        if self._filter_this_chain(
+            self.queue_service_client.get_multisig_transaction(payload["safeTxHash"])
+        ):
             return None
 
         safe_tx_hash = HexBytes(payload["safeTxHash"])
@@ -424,7 +465,9 @@ class QueueServiceSyncService:
 
         :param payload: ``MESSAGE_CREATED`` or ``MESSAGE_CONFIRMATION`` event
         """
-        message_data = self.queue_service_client.get_message(payload["messageHash"])
+        message_data = self._filter_this_chain(
+            self.queue_service_client.get_message(payload["messageHash"])
+        )
         if message_data is None:
             return None
 
@@ -487,6 +530,9 @@ class QueueServiceSyncService:
         """
         safe = payload.get("address")
         if safe and not SafeContract.objects.filter(address=safe).exists():
+            # A delegate for every chain is expected for Safes not on this chain
+            if payload["chainId"] == ALL_CHAINS_CHAIN_ID:
+                return None
             raise SkippedEventException(f"Safe {safe} is not indexed")
 
         current_delegates = [

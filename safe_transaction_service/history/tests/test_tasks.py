@@ -481,7 +481,12 @@ class TestTasks(TestCase):
     ):
         sync_mock = get_queue_service_sync_service_mock.return_value.sync
         sync_mock.return_value = 3
-        self.assertEqual(sync_from_queue_service_task.delay().result, 3)
+        # Disabled
+        self.assertIsNone(sync_from_queue_service_task.delay().result)
+        sync_mock.assert_not_called()
+
+        with self.settings(QUEUE_SERVICE_URL="http://queue-service"):
+            self.assertEqual(sync_from_queue_service_task.delay().result, 3)
         sync_mock.assert_called_once_with(
             time_limit_seconds=QUEUE_SERVICE_SYNC_INTERVAL_SECONDS - 1
         )

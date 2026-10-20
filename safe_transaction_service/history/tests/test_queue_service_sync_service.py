@@ -347,6 +347,47 @@ class TestQueueServiceSyncService(TestCase):
         )
         self.assertEqual(multisig_transaction.confirmations.count(), 3)
 
+    def test_sync_existing_untrusted_multisig_transaction(self):
+        multisig_transaction = MultisigTransactionFactory(
+            ethereum_tx=None, trusted=False
+        )
+        tx_data = build_multisig_transaction_data(
+            safe_tx_hash=multisig_transaction.safe_tx_hash,
+            safe=multisig_transaction.safe,
+            confirmations=[],
+        )
+        self.queue_service_client.get_multisig_transaction.return_value = tx_data
+        self.sync_service.sync_multisig_transaction(tx_data)
+        multisig_transaction.refresh_from_db()
+        self.assertTrue(multisig_transaction.trusted)
+
+    def test_sync_multisig_transaction_without_data(self):
+        tx_data = build_multisig_transaction_data(data="0x")
+        self.queue_service_client.get_multisig_transaction.return_value = tx_data
+        self.sync_service.sync_multisig_transaction(tx_data)
+        self.assertIsNone(MultisigTransaction.objects.get().data)
+
+    def test_sync_multisig_transaction_of_another_chain(self):
+        # Safes older than v1.3.0 build the same hash on every chain
+        multisig_transaction = MultisigTransactionFactory(ethereum_tx=None)
+        tx_data = build_multisig_transaction_data(
+            safe_tx_hash=multisig_transaction.safe_tx_hash, chainId="100"
+        )
+        self.queue_service_client.get_multisig_transaction.return_value = tx_data
+        self.sync_service.sync_multisig_transaction(
+            build_multisig_transaction_data(chainId="100")
+        )
+        self.assertEqual(MultisigTransaction.objects.count(), 1)
+
+        self.sync_service.sync_deleted_multisig_transaction(tx_data)
+        self.assertFalse(MultisigTransaction.objects.exists())
+
+        self.queue_service_client.get_message.return_value = build_message_data() | {
+            "chainId": "100"
+        }
+        self.sync_service.sync_message({"messageHash": "0x1"})
+        self.assertFalse(SafeMessage.objects.exists())
+
     def test_sync_executed_multisig_transaction(self):
         # Executed in this service
         multisig_transaction = MultisigTransactionFactory()
@@ -522,6 +563,14 @@ class TestQueueServiceSyncService(TestCase):
         self.assertEqual(self.sync_without_events(), 2)
         self.assertFalse(SafeContractDelegate.objects.exists())
 
+    def test_sync_delegate_safe_not_in_this_chain(self):
+        # Delegates for every chain are expected for Safes not on this chain
+        with self.assertNoLogs(LOGGER_NAME, level="WARNING"):
+            self.sync_service.sync_delegate(
+                build_delegate_event(chain_id="0", address=Account.create().address)
+            )
+        self.queue_service_client.get_delegates.assert_not_called()
+
     def test_sync_delegate_stale_event(self):
         # A create event processed after the delegate was deleted does not
         # create it again
@@ -613,6 +662,25 @@ class TestQueueServiceSyncService(TestCase):
         )
 
         # Once the Queue Service is back, the event is processed
+        self.queue_service_client.get_multisig_transaction.side_effect = None
+        self.queue_service_client.get_multisig_transaction.return_value = tx_data
+        self.assertEqual(self.sync_without_events(), 1)
+        self.assertTrue(MultisigTransaction.objects.exists())
+
+    def test_sync_queue_service_unavailable(self):
+        tx_data = build_multisig_transaction_data()
+        response = requests.Response()
+        response.status_code = 503
+        self.queue_service_client.get_multisig_transaction.side_effect = (
+            requests.HTTPError("503 Service Unavailable", response=response)
+        )
+        self.publish(
+            build_multisig_transaction_event(tx_data["safeTxHash"], tx_data["safe"])
+        )
+        # The event is kept while the Queue Service is restarted
+        self.assertEqual(self.sync_without_events(), 0)
+        self.assertEqual(self.sync_without_events(), 0)
+
         self.queue_service_client.get_multisig_transaction.side_effect = None
         self.queue_service_client.get_multisig_transaction.return_value = tx_data
         self.assertEqual(self.sync_without_events(), 1)

@@ -578,8 +578,10 @@ def sync_from_queue_service_task(self) -> int | None:
     Copy the data written to the Queue Service into this service. Runs often,
     so it expires fast and runs are not accumulated when workers are busy.
 
-    :return: Number of events processed
+    :return: Number of messages consumed
     """
+    if not settings.QUEUE_SERVICE_URL:
+        return None
     with contextlib.suppress(LockError):
         with only_one_running_task(self):
             return get_queue_service_sync_service().sync(
