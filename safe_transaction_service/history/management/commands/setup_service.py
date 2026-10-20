@@ -17,6 +17,7 @@ from safe_eth.safe.addresses import (
 )
 
 from ...models import IndexingStatus, IndexingStatusType, ProxyFactory, SafeMasterCopy
+from ...services.queue_service_sync_service import QUEUE_SERVICE_SYNC_INTERVAL_SECONDS
 
 
 @dataclass
@@ -145,6 +146,13 @@ TASKS = [
         name="safe_transaction_service.history.tasks.delete_expired_delegates_task",
         description="Remove expired Safe Contract Delegates (every hour at minute 0)",
         cron=CronDefinition(minute=0),  # Every hour at minute 0 - 0 * * * *
+    ),
+    CeleryTaskConfiguration(
+        name="safe_transaction_service.history.tasks.sync_from_queue_service_task",
+        description=f"Copy Queue Service data (every {QUEUE_SERVICE_SYNC_INTERVAL_SECONDS} seconds)",
+        interval=QUEUE_SERVICE_SYNC_INTERVAL_SECONDS,
+        period=IntervalSchedule.SECONDS,
+        enabled=bool(settings.QUEUE_SERVICE_URL),
     ),
     CeleryTaskConfiguration(
         name="safe_transaction_service.tokens.tasks.fix_pool_tokens_task",

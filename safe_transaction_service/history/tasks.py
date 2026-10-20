@@ -48,6 +48,10 @@ from .services.collectibles_service import (
     MetadataRetrievalExceptionTimeout,
 )
 from .services.event_service import build_reorg_payload
+from .services.queue_service_sync_service import (
+    QUEUE_SERVICE_SYNC_INTERVAL_SECONDS,
+    get_queue_service_sync_service,
+)
 
 logger = get_task_logger(__name__)
 
@@ -565,6 +569,23 @@ def remove_not_trusted_multisig_txs_task(
         .delete()
     )
     return deleted
+
+
+@app.shared_task(bind=True, expires=QUEUE_SERVICE_SYNC_INTERVAL_SECONDS)
+@task_timeout(timeout_seconds=LOCK_TIMEOUT)
+def sync_from_queue_service_task(self) -> int | None:
+    """
+    Copy the data written to the Queue Service into this service. Runs often,
+    so it expires fast and runs are not accumulated when workers are busy.
+
+    :return: Number of events processed
+    """
+    with contextlib.suppress(LockError):
+        with only_one_running_task(self):
+            return get_queue_service_sync_service().sync(
+                time_limit_seconds=QUEUE_SERVICE_SYNC_INTERVAL_SECONDS - 1
+            )
+    return None
 
 
 @app.shared_task()
