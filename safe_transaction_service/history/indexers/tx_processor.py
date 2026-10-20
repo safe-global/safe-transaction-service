@@ -645,8 +645,12 @@ class SafeTxProcessor(TxProcessor):
                         old_safe_version, new_safe_version
                     )
                 ):
-                    # Transactions queued not executed are not valid anymore
-                    MultisigTransaction.objects.queued(contract_address).delete()
+                    # Queued transactions proposed before the upgrade was mined use
+                    # the old `safe_tx_hash` format, so they are not valid anymore.
+                    # Transactions proposed later use the new format
+                    MultisigTransaction.objects.queued(contract_address).filter(
+                        created__lt=internal_tx.timestamp
+                    ).delete()
                 self.store_new_safe_status(
                     safe_last_status, internal_tx, ["master_copy"]
                 )

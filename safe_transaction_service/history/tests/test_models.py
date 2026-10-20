@@ -1595,6 +1595,23 @@ class TestMultisigTransactions(TestCase):
         MultisigTransactionFactory(safe=safe_address, nonce=13)
         self.assertEqual(MultisigTransaction.objects.last_nonce(safe_address), 25)
 
+    def test_transactions_via_indexer_and_api(self):
+        indexer_multisig_tx = MultisigTransactionFactory(origin={})
+        api_multisig_tx = MultisigTransactionFactory(origin={"url": "https://app"})
+        api_multisig_tx_str_origin = MultisigTransactionFactory(origin="Something")
+        api_multisig_tx_no_origin = MultisigTransactionFactory(
+            origin={}, proposer=Account.create().address
+        )
+
+        self.assertCountEqual(
+            MultisigTransaction.objects.transactions_via_indexer(),
+            [indexer_multisig_tx],
+        )
+        self.assertCountEqual(
+            MultisigTransaction.objects.transactions_via_api(),
+            [api_multisig_tx, api_multisig_tx_str_origin, api_multisig_tx_no_origin],
+        )
+
     def test_safes_with_number_of_transactions_executed(self):
         self.assertEqual(
             MultisigTransaction.objects.safes_with_number_of_transactions_executed().count(),

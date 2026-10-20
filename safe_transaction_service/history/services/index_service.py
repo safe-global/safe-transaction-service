@@ -1,11 +1,12 @@
 # SPDX-License-Identifier: FSL-1.1-MIT
+import datetime
 import logging
 from collections import OrderedDict
 from collections.abc import Collection
 from dataclasses import dataclass
 
 from django.db import transaction
-from django.db.models import Min, Q
+from django.db.models import F, Min, QuerySet
 
 import gevent
 from eth_typing import ChecksumAddress, Hash32
@@ -14,6 +15,7 @@ from safe_eth.eth import EthereumClient, get_auto_ethereum_client
 from safe_eth.eth.utils import fast_to_checksum_address
 from safe_eth.util.util import to_0x_hex_str
 
+from ..cache import CacheSafeTxsView, remove_cache_view_for_addresses
 from ..models import (
     EthereumBlock,
     EthereumTx,
@@ -29,6 +31,16 @@ from ..models import (
 from ..models import IndexingStatus as IndexingStatusDb
 
 logger = logging.getLogger(__name__)
+
+
+def _raw_delete(queryset: QuerySet) -> int:
+    """
+    Delete the rows of the queryset without Django signals or cascades
+
+    :return: Number of deleted rows
+    """
+    # Django returns `None` when no query is run, e.g. for an empty `__in` filter
+    return queryset._raw_delete(queryset.db) or 0
 
 
 @dataclass
@@ -378,9 +390,7 @@ class IndexService:
             queryset.delete()
 
         logger.info("Remove transactions automatically indexed")
-        queryset = MultisigTransaction.objects.exclude(ethereum_tx=None).filter(
-            Q(origin__exact={})
-        )
+        queryset = MultisigTransaction.objects.executed().transactions_via_indexer()
         if addresses:
             queryset = queryset.filter(safe__in=addresses)
         queryset.delete()
@@ -409,6 +419,80 @@ class IndexService:
             queryset = queryset.filter(safe_address__in=addresses)
         queryset.update(processed=False)
 
+    def _reset_executed_multisig_txs(
+        self, address: ChecksumAddress, timestamp: datetime.datetime
+    ) -> None:
+        """
+        Remove the execution data of the multisig transactions of a Safe executed
+        on or after `timestamp`, so processing the Safe again builds them with the
+        right nonce and `safe_tx_hash`. On chains indexed with traces the nonce of an
+        execution comes from the Safe status, so it depends on the processing order.
+        Processing uses `get_or_create`, so it never fixes rows built in a wrong order.
+
+        Transactions created by the indexer are deleted. Transactions proposed by
+        users are unlinked from their ethereum tx. Rows are changed without Django
+        signals, so no events are sent. The view cache of the Safe is removed.
+
+        :param address: Safe to reset
+        :param timestamp: Only reset transactions executed on or after `timestamp`
+        """
+        multisig_txs = MultisigTransaction.objects.filter(
+            safe=address, ethereum_tx__block__timestamp__gte=timestamp
+        )
+        indexer_safe_tx_hashes = list(
+            multisig_txs.transactions_via_indexer().values_list(
+                "safe_tx_hash", flat=True
+            )
+        )
+        api_safe_tx_hashes = list(
+            multisig_txs.transactions_via_api().values_list("safe_tx_hash", flat=True)
+        )
+
+        # `approveHash` confirmations are kept, as their transaction can be older
+        # than `timestamp`. They are linked again when the multisig tx is created
+        MultisigConfirmation.objects.filter(
+            multisig_transaction_id__in=indexer_safe_tx_hashes
+        ).exclude(ethereum_tx=None).update(multisig_transaction=None)
+        deleted_confirmations = _raw_delete(
+            MultisigConfirmation.objects.filter(
+                multisig_transaction_id__in=indexer_safe_tx_hashes
+            )
+        )
+        deleted_txs = _raw_delete(
+            MultisigTransaction.objects.filter(pk__in=indexer_safe_tx_hashes)
+        )
+        logger.info(
+            "[%s] Removed %d executed multisig txs created by the indexer and %d confirmations",
+            address,
+            deleted_txs,
+            deleted_confirmations,
+        )
+
+        # `SafeTxProcessor` stores the confirmations built from the execution
+        # signatures with the block timestamp as `created`. API confirmations use
+        # the time they were received
+        deleted_confirmations = _raw_delete(
+            MultisigConfirmation.objects.filter(
+                multisig_transaction_id__in=api_safe_tx_hashes,
+                ethereum_tx=None,
+                created=F("multisig_transaction__ethereum_tx__block__timestamp"),
+            )
+        )
+        unlinked_txs = MultisigTransaction.objects.filter(
+            pk__in=api_safe_tx_hashes
+        ).update(ethereum_tx=None)
+        logger.info(
+            "[%s] Unlinked %d executed multisig txs proposed by users and removed %d confirmations",
+            address,
+            unlinked_txs,
+            deleted_confirmations,
+        )
+        # Rows were changed without Django signals, so the view cache must be
+        # removed here
+        remove_cache_view_for_addresses(
+            CacheSafeTxsView.LIST_MULTISIGTRANSACTIONS_VIEW_CACHE_KEY, [address]
+        )
+
     @transaction.atomic
     def fix_out_of_order(
         self, address: ChecksumAddress, internal_tx: InternalTx
@@ -417,6 +501,8 @@ class IndexService:
         Fix a Safe that has transactions out of order (not processed transactions
         in between processed ones, usually due a reindex), by marking
         them as not processed from the `internal_tx` where the issue was detected.
+        Statuses and executed multisig transactions from that point are reset, as
+        they depend on the processing order.
 
         :param address: Safe to fix
         :param internal_tx: Only reprocess transactions from `internal_tx` and newer
@@ -431,6 +517,10 @@ class IndexService:
             tx_hash_hex,
             timestamp,
         )
+        # On L2 the nonce of an execution comes from the Safe events, so it does not
+        # depend on the processing order
+        if not self.eth_l2_network:
+            self._reset_executed_multisig_txs(address, timestamp)
         logger.info(
             "[%s] Marking InternalTxDecoded newer than timestamp as not processed",
             address,
