@@ -7,6 +7,9 @@ it while both services run in parallel.
 Every write is done with queryset operations that do not send model signals, so
 no event is published: the Queue Service already published its own. Cached views
 are cleared explicitly instead.
+
+The Queue Service validates hashes and signatures before storing them, so they
+are copied without checking them again.
 """
 
 import json
@@ -14,11 +17,18 @@ import logging
 import time
 from collections.abc import Callable
 from functools import cache
+from http import HTTPStatus
 from typing import Any
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.db import DataError, IntegrityError, transaction
+from django.db import (
+    DataError,
+    IntegrityError,
+    InterfaceError,
+    OperationalError,
+    transaction,
+)
 from django.db.models import Value
 from django.db.models.functions import Greatest
 from django.utils.dateparse import parse_datetime
@@ -67,9 +77,6 @@ QUEUE_TTL_MS = 24 * 60 * 60 * 1000
 # How often the sync task runs
 QUEUE_SERVICE_SYNC_INTERVAL_SECONDS = 5
 
-# HTTP status codes of the Queue Service while it is restarted or deployed
-QUEUE_SERVICE_UNAVAILABLE_STATUS_CODES = (502, 503, 504)
-
 # Log message for events that cannot be stored, used for a log-based metric
 SKIPPED_EVENT_LOG_MESSAGE = "Queue Service sync skipped event"
 
@@ -92,7 +99,7 @@ class QueueServiceClient(BaseHTTPClient):
         response = self.http_session.get(
             f"{self.base_url}{path}", timeout=self.request_timeout
         )
-        if response.status_code == 404:
+        if response.status_code == HTTPStatus.NOT_FOUND:
             return None
         response.raise_for_status()
         return response.json()
@@ -236,8 +243,10 @@ class QueueServiceSyncService:
 
     def process_message(self, message: Message) -> bool:
         """
-        Process one message and acknowledge it. When the Queue Service cannot be
-        reached, the message is requeued and the run stops. Other unexpected
+        Process one message and acknowledge it. On a temporary error of the
+        Queue Service or the database, the message is requeued and the run stops,
+        as many times as needed: a lost event can leave data that no longer
+        exists in the Queue Service, e.g. a deleted transaction. Other unexpected
         errors requeue the message once, and drop it if it fails again after
         being redelivered, so a message that always fails cannot block the queue.
 
@@ -256,13 +265,9 @@ class QueueServiceSyncService:
         except requests.RequestException as exc:
             if not self._is_queue_service_unavailable(exc):
                 return self._retry_once(message, payload, exc)
-            logger.warning(
-                "Queue Service cannot be reached, requeueing event %s: %s",
-                payload,
-                exc,
-            )
-            message.requeue()
-            return False
+            return self._requeue_and_stop(message, payload, exc)
+        except (OperationalError, InterfaceError) as exc:
+            return self._requeue_and_stop(message, payload, exc)
         except (
             SkippedEventException,
             IntegrityError,
@@ -280,10 +285,33 @@ class QueueServiceSyncService:
 
     @staticmethod
     def _is_queue_service_unavailable(exc: requests.RequestException) -> bool:
-        return isinstance(exc, (requests.ConnectionError, requests.Timeout)) or (
-            exc.response is not None
-            and exc.response.status_code in QUEUE_SERVICE_UNAVAILABLE_STATUS_CODES
+        """
+        :return: ``True`` if the Queue Service cannot be reached, is restarted or
+            overloaded, or the request is rate limited
+        """
+        if isinstance(exc, (requests.ConnectionError, requests.Timeout)):
+            return True
+        return exc.response is not None and (
+            exc.response.status_code == HTTPStatus.TOO_MANY_REQUESTS
+            or exc.response.status_code >= HTTPStatus.INTERNAL_SERVER_ERROR
         )
+
+    def _requeue_and_stop(
+        self, message: Message, payload: dict[str, Any] | str, exc: Exception
+    ) -> bool:
+        """
+        Requeue the message after a temporary error of the Queue Service or the
+        database.
+
+        :return: ``False``, the sync must stop for this run
+        """
+        logger.warning(
+            "Queue Service or database not available, requeueing event %s: %r",
+            payload,
+            exc,
+        )
+        message.requeue()
+        return False
 
     def _retry_once(
         self, message: Message, payload: dict[str, Any] | str, exc: Exception
@@ -522,13 +550,20 @@ class QueueServiceSyncService:
         This service has no chain for delegates: a delegate valid for every
         chain and one valid for this chain are the same row, which exists while
         one of them exists in the Queue Service. The Queue Service does not store
-        an expiry date.
+        an expiry date, so a delegate created there never expires. Other events
+        keep the expiry date of an existing delegate.
 
         :param payload: ``NEW_DELEGATE``, ``UPDATED_DELEGATE`` or
             ``DELETED_DELEGATE`` event
         :raises SkippedEventException: if the Safe of the delegate is not indexed
         """
-        safe = payload.get("address")
+        safe = (
+            fast_to_checksum_address(payload["address"])
+            if payload.get("address")
+            else None
+        )
+        delegate_address = fast_to_checksum_address(payload["delegate"])
+        delegator_address = fast_to_checksum_address(payload["delegator"])
         if safe and not SafeContract.objects.filter(address=safe).exists():
             # A delegate for every chain is expected for Safes not on this chain
             if payload["chainId"] == ALL_CHAINS_CHAIN_ID:
@@ -538,7 +573,7 @@ class QueueServiceSyncService:
         current_delegates = [
             delegate
             for delegate in self.queue_service_client.get_delegates(
-                payload["delegate"], payload["delegator"]
+                delegate_address, delegator_address
             )
             if (delegate["safe"] and fast_to_checksum_address(delegate["safe"])) == safe
             and (
@@ -547,8 +582,8 @@ class QueueServiceSyncService:
         ]
         queryset = SafeContractDelegate.objects.filter(
             safe_contract_id=safe,
-            delegate=payload["delegate"],
-            delegator=payload["delegator"],
+            delegate=delegate_address,
+            delegator=delegator_address,
         )
         if not current_delegates:
             # `delete()` would send `post_delete` and publish an event
@@ -559,7 +594,9 @@ class QueueServiceSyncService:
         current_delegate = min(
             current_delegates, key=lambda delegate: delegate["chainId"] is None
         )
-        fields = {"label": current_delegate["label"] or "", "expiry_date": None}
+        fields: dict[str, Any] = {"label": current_delegate["label"] or ""}
+        if payload["type"] == "NEW_DELEGATE":
+            fields["expiry_date"] = None
         # `update_or_create` would send `post_save`. A unique index with a null
         # `safe_contract` never conflicts, so `bulk_create` cannot upsert
         if not queryset.update(**fields):
@@ -567,8 +604,8 @@ class QueueServiceSyncService:
                 [
                     SafeContractDelegate(
                         safe_contract_id=safe,
-                        delegate=payload["delegate"],
-                        delegator=payload["delegator"],
+                        delegate=delegate_address,
+                        delegator=delegator_address,
                         **fields,
                     )
                 ]

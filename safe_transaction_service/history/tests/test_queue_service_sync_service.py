@@ -5,6 +5,7 @@ from unittest import mock
 from unittest.mock import MagicMock
 
 from django.conf import settings
+from django.db import InterfaceError, OperationalError
 from django.test import TestCase
 
 import requests
@@ -142,6 +143,12 @@ def build_delegate_event(
         "label": label,
         "expiryDateSeconds": None,
     }
+
+
+def build_http_error(status_code: int) -> requests.HTTPError:
+    response = requests.Response()
+    response.status_code = status_code
+    return requests.HTTPError(f"{status_code} Error", response=response)
 
 
 class TestQueueServiceSyncService(TestCase):
@@ -633,6 +640,54 @@ class TestQueueServiceSyncService(TestCase):
         )
         self.assertFalse(SafeContractDelegate.objects.exists())
 
+    def test_sync_delegate_expiry_date(self):
+        delegate = SafeContractDelegateFactory()
+        expiry_date = delegate.expiry_date
+        event = build_delegate_event(
+            event_type="UPDATED_DELEGATE",
+            address=delegate.safe_contract_id,
+            delegate=delegate.delegate,
+            delegator=delegate.delegator,
+            label="Updated",
+        )
+        self.set_queue_service_delegates(event)
+        self.sync_service.sync_delegate(event)
+        delegate.refresh_from_db()
+        self.assertEqual(delegate.label, "Updated")
+        self.assertEqual(delegate.expiry_date, expiry_date)
+
+        # Created again in the Queue Service, without expiry date
+        self.sync_service.sync_delegate(event | {"type": "NEW_DELEGATE"})
+        delegate.refresh_from_db()
+        self.assertIsNone(delegate.expiry_date)
+
+    def test_sync_delegate_empty_address(self):
+        # Delegate for every Safe
+        event = build_delegate_event(chain_id="0")
+        self.set_queue_service_delegates(event)
+        self.sync_service.sync_delegate(event | {"address": ""})
+        self.assertIsNone(SafeContractDelegate.objects.get().safe_contract_id)
+
+    def test_sync_delegate_not_checksummed_addresses(self):
+        safe_contract = SafeContractFactory()
+        event = build_delegate_event(address=safe_contract.address)
+        self.set_queue_service_delegates(event)
+        self.sync_service.sync_delegate(
+            event
+            | {
+                "address": event["address"].lower(),
+                "delegate": event["delegate"].lower(),
+                "delegator": event["delegator"].lower(),
+            }
+        )
+        self.queue_service_client.get_delegates.assert_called_once_with(
+            event["delegate"], event["delegator"]
+        )
+        delegate = SafeContractDelegate.objects.get()
+        self.assertEqual(delegate.safe_contract_id, safe_contract.address)
+        self.assertEqual(delegate.delegate, event["delegate"])
+        self.assertEqual(delegate.delegator, event["delegator"])
+
     def test_sync_ignores_events_not_from_queue_service(self):
         tx_data = build_multisig_transaction_data()
         self.queue_service_client.get_multisig_transaction.return_value = tx_data
@@ -668,28 +723,66 @@ class TestQueueServiceSyncService(TestCase):
         self.assertTrue(MultisigTransaction.objects.exists())
 
     def test_sync_queue_service_unavailable(self):
-        tx_data = build_multisig_transaction_data()
-        response = requests.Response()
-        response.status_code = 503
-        self.queue_service_client.get_multisig_transaction.side_effect = (
-            requests.HTTPError("503 Service Unavailable", response=response)
-        )
-        self.publish(
-            build_multisig_transaction_event(tx_data["safeTxHash"], tx_data["safe"])
-        )
-        # The event is kept while the Queue Service is restarted
-        self.assertEqual(self.sync_without_events(), 0)
-        self.assertEqual(self.sync_without_events(), 0)
+        # Restarted, overloaded or rate limited
+        for status_code in (429, 500, 503):
+            with self.subTest(status_code=status_code):
+                tx_data = build_multisig_transaction_data()
+                self.queue_service_client.get_multisig_transaction.side_effect = (
+                    build_http_error(status_code)
+                )
+                self.publish(
+                    build_multisig_transaction_event(
+                        tx_data["safeTxHash"], tx_data["safe"]
+                    )
+                )
+                # The event is kept, also after being redelivered
+                self.assertEqual(self.sync_without_events(), 0)
+                self.assertEqual(self.sync_without_events(), 0)
 
-        self.queue_service_client.get_multisig_transaction.side_effect = None
-        self.queue_service_client.get_multisig_transaction.return_value = tx_data
-        self.assertEqual(self.sync_without_events(), 1)
-        self.assertTrue(MultisigTransaction.objects.exists())
+                self.queue_service_client.get_multisig_transaction.side_effect = None
+                self.queue_service_client.get_multisig_transaction.return_value = (
+                    tx_data
+                )
+                self.assertEqual(self.sync_without_events(), 1)
+                self.assertTrue(
+                    MultisigTransaction.objects.filter(
+                        safe_tx_hash=tx_data["safeTxHash"]
+                    ).exists()
+                )
+
+    def test_sync_database_unavailable(self):
+        for error in (
+            OperationalError("server closed the connection"),
+            InterfaceError("connection already closed"),
+        ):
+            with self.subTest(error=error):
+                tx_data = build_multisig_transaction_data()
+                self.queue_service_client.get_multisig_transaction.return_value = (
+                    tx_data
+                )
+                self.publish(
+                    build_multisig_transaction_event(
+                        tx_data["safeTxHash"], tx_data["safe"]
+                    )
+                )
+                with mock.patch.object(
+                    MultisigTransaction.objects, "bulk_create", side_effect=error
+                ):
+                    # The event is kept, also after being redelivered
+                    self.assertEqual(self.sync_without_events(), 0)
+                    self.assertEqual(self.sync_without_events(), 0)
+
+                self.assertEqual(self.sync_without_events(), 1)
+                self.assertTrue(
+                    MultisigTransaction.objects.filter(
+                        safe_tx_hash=tx_data["safeTxHash"]
+                    ).exists()
+                )
 
     def test_sync_unexpected_error(self):
         tx_data = build_multisig_transaction_data()
         self.queue_service_client.get_multisig_transaction.side_effect = (
-            requests.HTTPError("500 Server Error")
+            build_http_error(400)
         )
         self.publish(
             build_multisig_transaction_event(tx_data["safeTxHash"], tx_data["safe"])
