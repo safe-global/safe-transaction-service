@@ -1,6 +1,9 @@
 # SPDX-License-Identifier: FSL-1.1-MIT
 """
-Store gunicorn variables in this file, so they can be read by Django
+Store gunicorn variables in this file, so they can be read by Django.
+
+It must stay outside the ``config`` package, as ``gunicorn.conf.py`` imports it
+(see the comment there).
 """
 
 import os

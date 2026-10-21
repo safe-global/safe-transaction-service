@@ -9,14 +9,13 @@ import environ
 from corsheaders.defaults import default_headers as default_cors_headers
 from eth_typing import ChecksumAddress, HexAddress, HexStr
 
-from safe_transaction_service import __version__
-from safe_transaction_service.loggers.custom_logger import SafeJsonFormatter
-
-from ..gunicorn import (
+from gunicorn_settings import (
     gunicorn_request_timeout,
     gunicorn_worker_connections,
     gunicorn_workers,
 )
+from safe_transaction_service import __version__
+from safe_transaction_service.loggers.custom_logger import SafeJsonFormatter
 
 ROOT_DIR = Path(__file__).resolve(strict=True).parent.parent.parent
 APPS_DIR = ROOT_DIR / "safe_transaction_service"
@@ -68,7 +67,7 @@ GUNICORN_WORKERS = gunicorn_workers
 # DATABASES
 # ------------------------------------------------------------------------------
 # https://docs.djangoproject.com/en/dev/ref/settings/#databases
-# DB statements should timeout before Gunicorn, so this value must be less than WEB_WORKER_TIMEOUT on gunicorn.py
+# DB statements should timeout before Gunicorn, so this value must be less than WEB_WORKER_TIMEOUT on gunicorn_settings.py
 DB_STATEMENT_TIMEOUT = env.int("DB_STATEMENT_TIMEOUT", 50_000)
 # Kills a statement waiting on a lock. Without this, a slow transaction holding a row lock causes other requests to
 # queue behind it — that queue can cascade into an outage. Must be lower than DB_STATEMENT_TIMEOUT.

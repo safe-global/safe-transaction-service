@@ -2,7 +2,9 @@
 from gunicorn.arbiter import Arbiter
 from gunicorn.workers.base import Worker
 
-from config.gunicorn import (
+# Do not import the `config` package here: it imports Celery, and this file runs
+# in the gunicorn master, before the gevent worker applies monkey patching
+from gunicorn_settings import (
     gunicorn_request_timeout,
     gunicorn_worker_connections,
     gunicorn_workers,

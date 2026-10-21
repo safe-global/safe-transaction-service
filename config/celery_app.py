@@ -46,6 +46,10 @@ def close_db_connections(**kwargs):
 
 
 app = Celery("safe_transaction_service")
+# `shared_task` tasks use Celery's current app, which is thread local. In other
+# threads and greenlets (e.g. web requests) it falls back to the default app, so
+# make this the default app instead of Celery's unconfigured one
+app.set_default()
 
 # Using a string here means the worker doesn't have to serialize
 # the configuration object to child processes.
