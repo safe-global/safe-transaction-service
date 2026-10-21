@@ -319,7 +319,8 @@ CELERY_TASK_ROUTES = (
             "safe_transaction_service.history.tasks.process_decoded_internal_txs_task",
             {"queue": "processing", "delivery_mode": "transient"},
         ),
-        # Short and frequent task, kept apart from the long indexing tasks
+        # Frequent task that must start on time, kept apart from the long
+        # indexing tasks. Each run takes a worker greenlet for ~4 of every 5s
         (
             "safe_transaction_service.history.tasks.sync_from_queue_service_task",
             {"queue": "contracts", "delivery_mode": "transient"},

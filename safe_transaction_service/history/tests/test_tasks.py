@@ -3,7 +3,7 @@ import dataclasses
 import datetime
 import json
 import logging
-from unittest.mock import MagicMock, patch
+from unittest.mock import ANY, MagicMock, patch
 
 from django.test import TestCase
 from django.utils import timezone
@@ -14,6 +14,7 @@ from hexbytes import HexBytes
 from safe_transaction_service.events.services import QueueService
 
 from ...utils.redis import get_redis
+from ...utils.tasks import WORKER_STOPPED
 from ..indexers import (
     Erc20EventsIndexerProvider,
     FindRelevantElementsException,
@@ -36,7 +37,7 @@ from ..services import (
 )
 from ..services.collectibles_service import CollectibleWithMetadata
 from ..services.index_service import SpecificIndexingStatus
-from ..services.queue_service_sync_service import QUEUE_SERVICE_SYNC_INTERVAL_SECONDS
+from ..services.queue_service_sync_service import QUEUE_SERVICE_SYNC_TIME_LIMIT_SECONDS
 from ..tasks import (
     check_reorgs_task,
     check_sync_status_task,
@@ -488,5 +489,13 @@ class TestTasks(TestCase):
         with self.settings(QUEUE_SERVICE_URL="http://queue-service"):
             self.assertEqual(sync_from_queue_service_task.delay().result, 3)
         sync_mock.assert_called_once_with(
-            time_limit_seconds=QUEUE_SERVICE_SYNC_INTERVAL_SECONDS - 1
+            time_limit_seconds=QUEUE_SERVICE_SYNC_TIME_LIMIT_SECONDS,
+            should_stop=ANY,
         )
+        should_stop = sync_mock.call_args.kwargs["should_stop"]
+        self.assertFalse(should_stop())
+        WORKER_STOPPED.add(True)
+        try:
+            self.assertTrue(should_stop())
+        finally:
+            WORKER_STOPPED.discard(True)

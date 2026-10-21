@@ -76,6 +76,13 @@ QUEUE_TTL_MS = 24 * 60 * 60 * 1000
 
 # How often the sync task runs
 QUEUE_SERVICE_SYNC_INTERVAL_SECONDS = 5
+# How long a sync run takes new events from the queue. Shorter than the
+# interval, so a run usually ends before the next one starts. The event in
+# process when it is reached is finished first
+QUEUE_SERVICE_SYNC_TIME_LIMIT_SECONDS = QUEUE_SERVICE_SYNC_INTERVAL_SECONDS - 1
+
+# How long the sync waits before reading the queue again when it is empty
+QUEUE_EMPTY_WAIT_SECONDS = 0.2
 
 # Log message for events that cannot be stored, used for a log-based metric
 SKIPPED_EVENT_LOG_MESSAGE = "Queue Service sync skipped event"
@@ -209,12 +216,20 @@ class QueueServiceSyncService:
         # so it is done once per connection
         self.queue_declared = False
 
-    def sync(self, time_limit_seconds: float) -> int:
+    def sync(
+        self,
+        time_limit_seconds: float,
+        should_stop: Callable[[], bool] = lambda: False,
+    ) -> int:
         """
-        Process the pending events of the queue until it is empty, the time
-        limit is reached, or the Queue Service cannot be reached.
+        Process the events of the queue until the time limit is reached, the
+        Queue Service cannot be reached, or ``should_stop`` returns ``True``. An
+        empty queue is read again after a short wait, so new events are
+        processed soon after they are published.
 
         :param time_limit_seconds: Stop taking new events after this time
+        :param should_stop: Checked before taking each event, e.g. to stop when
+            the worker is shutting down
         :return: Number of messages consumed, including the ones from other
             publishers, which are ignored
         """
@@ -226,10 +241,11 @@ class QueueServiceSyncService:
                 if not self.queue_declared:
                     queue.declare()
                     self.queue_declared = True
-                while time.monotonic() < deadline:
+                while time.monotonic() < deadline and not should_stop():
                     message = queue.get(no_ack=False)
                     if message is None:
-                        break
+                        time.sleep(QUEUE_EMPTY_WAIT_SECONDS)
+                        continue
                     if not self.process_message(message):
                         break
                     processed += 1

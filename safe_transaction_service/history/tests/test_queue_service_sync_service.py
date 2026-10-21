@@ -1,5 +1,7 @@
 # SPDX-License-Identifier: FSL-1.1-MIT
 import json
+import threading
+import time
 from typing import Any
 from unittest import mock
 from unittest.mock import MagicMock
@@ -10,6 +12,7 @@ from django.test import TestCase
 
 import requests
 from eth_account import Account
+from gevent import Timeout
 from hexbytes import HexBytes
 from kombu import Connection, Exchange, Producer
 from safe_eth.eth.constants import NULL_ADDRESS
@@ -167,8 +170,13 @@ class TestQueueServiceSyncService(TestCase):
     def tearDown(self):
         self.connection.release()
 
-    def publish(self, payload: dict[str, Any], app_id: str = QUEUE_SERVICE_APP_ID):
-        with self.connection.channel() as channel:
+    def publish(
+        self,
+        payload: dict[str, Any],
+        app_id: str = QUEUE_SERVICE_APP_ID,
+        connection: Connection | None = None,
+    ):
+        with (connection or self.connection).channel() as channel:
             Producer(channel).publish(
                 json.dumps(payload),
                 exchange=Exchange(
@@ -187,7 +195,7 @@ class TestQueueServiceSyncService(TestCase):
         """
         with mock.patch.object(QueueService, "send_events") as send_events_mock:
             with self.captureOnCommitCallbacks(execute=True):
-                processed = self.sync_service.sync(time_limit_seconds=5)
+                processed = self.sync_service.sync(time_limit_seconds=0.5)
         send_events_mock.assert_not_called()
         return processed
 
@@ -815,6 +823,122 @@ class TestQueueServiceSyncService(TestCase):
         # Nothing of the events is stored
         self.assertFalse(MultisigTransaction.objects.exists())
         self.assertFalse(SafeContractDelegate.objects.exists())
+
+    def queue_status(self) -> tuple[int, int]:
+        """
+        :return: Messages in the queue (ready and unacknowledged) and consumers
+        """
+        with self.connection.channel() as channel:
+            _, message_count, consumer_count = self.sync_service.queue(
+                channel
+            ).queue_declare(passive=True)
+        return message_count, consumer_count
+
+    def open_channels(self) -> int:
+        return len(self.connection.connection.channels)
+
+    def test_sync_waits_for_new_events(self):
+        tx_data = build_multisig_transaction_data()
+        published_at, stored_at = [], []
+        self.queue_service_client.get_multisig_transaction.side_effect = (
+            lambda safe_tx_hash: stored_at.append(time.monotonic()) or tx_data
+        )
+        event = build_multisig_transaction_event(tx_data["safeTxHash"], tx_data["safe"])
+
+        def publish():
+            # Own connection, as kombu connections are not thread safe
+            with Connection(settings.EVENTS_QUEUE_URL) as connection:
+                self.publish(event, connection=connection)
+            published_at.append(time.monotonic())
+
+        # Published while the run reads the empty queue
+        publisher = threading.Timer(0.5, publish)
+        publisher.start()
+        started_at = time.monotonic()
+        processed = self.sync_service.sync(time_limit_seconds=1.5)
+        publisher.join()
+
+        self.assertEqual(processed, 1)
+        self.assertLess(stored_at[0] - published_at[0], 0.5)
+        # The run keeps reading the queue until the time limit
+        self.assertGreaterEqual(time.monotonic() - started_at, 1.5)
+        self.assertTrue(MultisigTransaction.objects.exists())
+
+    def test_sync_time_limit_while_processing(self):
+        # The event in process when the time limit is reached is finished and
+        # acknowledged. The next events stay in the queue for the next run
+        txs_data = [build_multisig_transaction_data() for _ in range(3)]
+        txs_by_hash = {tx_data["safeTxHash"]: tx_data for tx_data in txs_data}
+
+        def slow_get(safe_tx_hash: str):
+            time.sleep(0.6)
+            return txs_by_hash[safe_tx_hash]
+
+        self.queue_service_client.get_multisig_transaction.side_effect = slow_get
+        for tx_data in txs_data:
+            self.publish(
+                build_multisig_transaction_event(tx_data["safeTxHash"], tx_data["safe"])
+            )
+        channels = self.open_channels()
+
+        self.assertEqual(self.sync_service.sync(time_limit_seconds=0.5), 1)
+        self.assertEqual(MultisigTransaction.objects.count(), 1)
+        self.assertEqual(self.queue_status(), (2, 0))
+        self.assertEqual(self.open_channels(), channels)
+
+        self.assertEqual(self.sync_service.sync(time_limit_seconds=1), 2)
+        self.assertEqual(MultisigTransaction.objects.count(), 3)
+        self.assertEqual(self.queue_status(), (0, 0))
+        self.assertEqual(self.open_channels(), channels)
+
+    def test_sync_interrupted(self):
+        # The task timeout raises in the middle of an event: nothing of it is
+        # stored and it is processed again in the next run
+        tx_data = build_multisig_transaction_data()
+        self.queue_service_client.get_multisig_transaction.return_value = tx_data
+        self.publish(
+            build_multisig_transaction_event(tx_data["safeTxHash"], tx_data["safe"])
+        )
+        channels = self.open_channels()
+
+        with mock.patch.object(
+            MultisigConfirmation.objects, "bulk_create", side_effect=Timeout
+        ):
+            with self.assertRaises(Timeout):
+                self.sync_service.sync(time_limit_seconds=1)
+        self.assertFalse(MultisigTransaction.objects.exists())
+        self.assertEqual(self.queue_status(), (1, 0))
+        self.assertEqual(self.open_channels(), channels)
+
+        self.assertEqual(self.sync_without_events(), 1)
+        self.assertEqual(MultisigTransaction.objects.count(), 1)
+        self.assertEqual(MultisigConfirmation.objects.count(), 1)
+        self.assertEqual(self.queue_status(), (0, 0))
+
+    def test_sync_should_stop(self):
+        tx_data = build_multisig_transaction_data()
+        self.queue_service_client.get_multisig_transaction.return_value = tx_data
+        self.publish(
+            build_multisig_transaction_event(tx_data["safeTxHash"], tx_data["safe"])
+        )
+        started_at = time.monotonic()
+        self.assertEqual(
+            self.sync_service.sync(time_limit_seconds=5, should_stop=lambda: True), 0
+        )
+        self.assertLess(time.monotonic() - started_at, 1)
+        # The event is kept for the next run
+        self.assertEqual(self.queue_status(), (1, 0))
+
+        # Stop requested while the run reads the empty queue
+        stop_at = time.monotonic() + 0.5
+        self.assertEqual(
+            self.sync_service.sync(
+                time_limit_seconds=5, should_stop=lambda: time.monotonic() > stop_at
+            ),
+            1,
+        )
+        self.assertLess(time.monotonic() - stop_at, 1)
+        self.assertEqual(self.queue_status(), (0, 0))
 
     def test_sync_declares_queue_once(self):
         with mock.patch("kombu.Queue.declare") as declare_mock:
