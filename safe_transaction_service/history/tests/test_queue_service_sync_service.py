@@ -5,7 +5,7 @@ from unittest import mock
 from unittest.mock import MagicMock
 
 from django.conf import settings
-from django.db import OperationalError
+from django.db import InterfaceError, OperationalError
 from django.test import TestCase
 
 import requests
@@ -751,22 +751,33 @@ class TestQueueServiceSyncService(TestCase):
                 )
 
     def test_sync_database_unavailable(self):
-        tx_data = build_multisig_transaction_data()
-        self.queue_service_client.get_multisig_transaction.return_value = tx_data
-        self.publish(
-            build_multisig_transaction_event(tx_data["safeTxHash"], tx_data["safe"])
-        )
-        with mock.patch.object(
-            MultisigTransaction.objects,
-            "bulk_create",
-            side_effect=OperationalError("server closed the connection"),
+        for error in (
+            OperationalError("server closed the connection"),
+            InterfaceError("connection already closed"),
         ):
-            # The event is kept, also after being redelivered
-            self.assertEqual(self.sync_without_events(), 0)
-            self.assertEqual(self.sync_without_events(), 0)
+            with self.subTest(error=error):
+                tx_data = build_multisig_transaction_data()
+                self.queue_service_client.get_multisig_transaction.return_value = (
+                    tx_data
+                )
+                self.publish(
+                    build_multisig_transaction_event(
+                        tx_data["safeTxHash"], tx_data["safe"]
+                    )
+                )
+                with mock.patch.object(
+                    MultisigTransaction.objects, "bulk_create", side_effect=error
+                ):
+                    # The event is kept, also after being redelivered
+                    self.assertEqual(self.sync_without_events(), 0)
+                    self.assertEqual(self.sync_without_events(), 0)
 
-        self.assertEqual(self.sync_without_events(), 1)
-        self.assertTrue(MultisigTransaction.objects.exists())
+                self.assertEqual(self.sync_without_events(), 1)
+                self.assertTrue(
+                    MultisigTransaction.objects.filter(
+                        safe_tx_hash=tx_data["safeTxHash"]
+                    ).exists()
+                )
 
     def test_sync_unexpected_error(self):
         tx_data = build_multisig_transaction_data()
