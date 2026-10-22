@@ -20,7 +20,7 @@ from safe_transaction_service.utils.redis import get_redis
 
 from ..events.services.queue_service import get_queue_service
 from ..utils.celery import task_timeout
-from ..utils.tasks import LOCK_TIMEOUT, only_one_running_task
+from ..utils.tasks import LOCK_TIMEOUT, WORKER_STOPPED, only_one_running_task
 from .indexers import (
     Erc20EventsIndexerProvider,
     FindRelevantElementsException,
@@ -50,6 +50,7 @@ from .services.collectibles_service import (
 from .services.event_service import build_reorg_payload
 from .services.queue_service_sync_service import (
     QUEUE_SERVICE_SYNC_INTERVAL_SECONDS,
+    QUEUE_SERVICE_SYNC_TIME_LIMIT_SECONDS,
     get_queue_service_sync_service,
 )
 
@@ -576,7 +577,11 @@ def remove_not_trusted_multisig_txs_task(
 def sync_from_queue_service_task(self) -> int | None:
     """
     Copy the data written to the Queue Service into this service. Runs often,
-    so it expires fast and runs are not accumulated when workers are busy.
+    so it expires fast and runs are not accumulated when workers are busy. Each
+    run keeps reading the queue for ``QUEUE_SERVICE_SYNC_TIME_LIMIT_SECONDS``,
+    also when it is empty. It stops taking new events when the worker is
+    shutting down, as the lock is released then and another worker could start
+    reading the queue.
 
     :return: Number of messages consumed
     """
@@ -585,7 +590,8 @@ def sync_from_queue_service_task(self) -> int | None:
     with contextlib.suppress(LockError):
         with only_one_running_task(self):
             return get_queue_service_sync_service().sync(
-                time_limit_seconds=QUEUE_SERVICE_SYNC_INTERVAL_SECONDS - 1
+                time_limit_seconds=QUEUE_SERVICE_SYNC_TIME_LIMIT_SECONDS,
+                should_stop=lambda: bool(WORKER_STOPPED),
             )
     return None
 
