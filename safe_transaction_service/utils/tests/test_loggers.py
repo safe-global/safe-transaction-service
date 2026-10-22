@@ -65,3 +65,17 @@ class TestLoggers(TestCase):
         self.assertEqual(
             json.loads(SafeJsonFormatter().format(record))["timestamp"], 1700000000123
         )
+
+    def test_safe_json_formatter_trace_correlation(self):
+        record = LogRecord(
+            "name", logging.INFO, "/", 2, "Http request", args=(), exc_info=None
+        )
+        self.assertNotIn("dd", json.loads(SafeJsonFormatter().format(record)))
+
+        record.__dict__.update(
+            {"dd.trace_id": "6ad8ead100000000010fea4db8065af1", "dd.span_id": "42"}
+        )
+        self.assertEqual(
+            json.loads(SafeJsonFormatter().format(record))["dd"],
+            {"trace_id": "6ad8ead100000000010fea4db8065af1", "span_id": "42"},
+        )
