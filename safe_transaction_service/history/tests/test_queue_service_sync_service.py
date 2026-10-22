@@ -14,7 +14,7 @@ import requests
 from eth_account import Account
 from gevent import Timeout
 from hexbytes import HexBytes
-from kombu import Connection, Exchange, Producer
+from kombu import Connection, Exchange, Producer, Queue
 from safe_eth.eth.constants import NULL_ADDRESS
 from safe_eth.eth.utils import fast_keccak_text
 from safe_eth.safe.safe_signature import SafeSignatureType
@@ -938,6 +938,29 @@ class TestQueueServiceSyncService(TestCase):
             1,
         )
         self.assertLess(time.monotonic() - stop_at, 1)
+        self.assertEqual(self.queue_status(), (0, 0))
+
+    def test_sync_broker_error_while_waiting(self):
+        tx_data = build_multisig_transaction_data()
+        self.queue_service_client.get_multisig_transaction.return_value = tx_data
+        self.publish(
+            build_multisig_transaction_event(tx_data["safeTxHash"], tx_data["safe"])
+        )
+
+        # The broker is restarted while the run reads the empty queue
+        with mock.patch.object(
+            Queue, "get", side_effect=[None, ConnectionResetError("Connection reset")]
+        ):
+            with self.assertLogs(LOGGER_NAME, level="WARNING") as logs:
+                self.assertEqual(self.sync_service.sync(time_limit_seconds=5), 0)
+        self.assertIn("Cannot read events from the broker", logs.output[0])
+        self.assertFalse(self.sync_service.queue_declared)
+        self.assertFalse(MultisigTransaction.objects.exists())
+
+        # The next run connects again, declares the queue and gets the event
+        self.assertEqual(self.sync_without_events(), 1)
+        self.assertTrue(self.sync_service.queue_declared)
+        self.assertTrue(MultisigTransaction.objects.exists())
         self.assertEqual(self.queue_status(), (0, 0))
 
     def test_sync_declares_queue_once(self):
