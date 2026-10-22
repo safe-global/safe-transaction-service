@@ -85,6 +85,56 @@ thread.join()
             cwd=settings.ROOT_DIR,
         )
 
+    def test_celery_beat_admin_uses_project_app_in_new_threads(self):
+        """
+        django-celery-beat admin reads Celery's ``current_app`` on every request, so
+        the task dropdown and the "Run selected tasks" action must get the project app
+        in threads other than the main one (web requests)
+        """
+        code = """
+import threading
+from unittest import mock
+
+import django
+
+django.setup()
+
+from celery.app.task import Task
+from django.contrib.admin import site
+from django_celery_beat.admin import PeriodicTaskAdmin, TaskSelectWidget
+from django_celery_beat.models import PeriodicTask
+
+task_name = "safe_transaction_service.history.tasks.reindex_mastercopies_last_hours_task"
+model_admin = PeriodicTaskAdmin(PeriodicTask, site)
+
+
+def check():
+    print(task_name in dict(TaskSelectWidget().tasks_as_choices()))
+    with (
+        mock.patch.object(model_admin, "message_user") as message_user_mock,
+        mock.patch.object(Task, "apply_async", autospec=True) as apply_async_mock,
+    ):
+        model_admin.run_tasks(None, [PeriodicTask(name="test", task=task_name)])
+    print(message_user_mock.call_args.args[1])
+    task = apply_async_mock.call_args.args[0]
+    print(task.app.main, task.app.amqp.router.route({}, task.name)["queue"].name)
+
+
+thread = threading.Thread(target=check)
+thread.start()
+thread.join()
+"""
+        stdout = self._run_python(code)
+
+        self.assertEqual(
+            stdout.strip().splitlines()[-3:],
+            [
+                "True",
+                "1 task was successfully run",
+                "safe_transaction_service indexing",
+            ],
+        )
+
     def test_db_connections_closed_after_task(self):
         conn_to_close = mock.Mock(in_atomic_block=False)
         conn_in_atomic = mock.Mock(in_atomic_block=True)
