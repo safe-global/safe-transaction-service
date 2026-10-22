@@ -170,6 +170,7 @@ def build_event_payload(
             )
             payload["isFailed"] = instance.failed
             payload["txHash"] = to_0x_hex_str(HexBytes(instance.ethereum_tx_id))
+            payload["executor"] = instance.ethereum_tx._from
         else:
             # Off-chain event (not yet executed): use the proposal creation time,
             # kept first for readability

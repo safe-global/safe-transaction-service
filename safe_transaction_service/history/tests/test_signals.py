@@ -111,13 +111,16 @@ class TestSignals(SafeTestCaseMixin, TestCase):
         self.assertEqual(payload["timestamp"], int(confirmation.created.timestamp()))
 
         # EXECUTED_MULTISIG_TRANSACTION is on-chain (tier 2): no timestamp yet
-        payload = build_event_payload(
-            MultisigTransaction, MultisigTransactionFactory()
-        )[0]
+        multisig_tx = MultisigTransactionFactory()
+        # With `ethereum_tx` cached, building the payload must not query
+        # the database
+        with self.assertNumQueries(0):
+            payload = build_event_payload(MultisigTransaction, multisig_tx)[0]
         self.assertEqual(
             payload["type"],
             TransactionServiceEventType.EXECUTED_MULTISIG_TRANSACTION.name,
         )
+        self.assertEqual(payload["executor"], multisig_tx.ethereum_tx._from)
         self.assertEqual(payload["chainId"], str(EthereumNetwork.GANACHE.value))
         self.assertNotIn("timestamp", payload)
 
@@ -128,6 +131,7 @@ class TestSignals(SafeTestCaseMixin, TestCase):
             payload["type"],
             TransactionServiceEventType.PENDING_MULTISIG_TRANSACTION.name,
         )
+        self.assertNotIn("executor", payload)
         self.assertEqual(payload["chainId"], str(EthereumNetwork.GANACHE.value))
         self.assertEqual(
             payload["timestamp"], int(pending_multisig_tx.created.timestamp())
@@ -411,6 +415,7 @@ class TestSignals(SafeTestCaseMixin, TestCase):
             ),
             "isFailed": False,
             "txHash": multisig_tx.ethereum_tx_id,
+            "executor": multisig_tx.ethereum_tx._from,
             "chainId": str(EthereumNetwork.GANACHE.value),
         }
         send_events_mock.assert_called_with([pending_multisig_transaction_payload])

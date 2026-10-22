@@ -43,6 +43,7 @@ from ..models import (
     SafeStatus,
     TransactionServiceEventType,
 )
+from ..services.event_service import build_event_payload
 from .factories import (
     EthereumTxFactory,
     InternalTxDecodedFactory,
@@ -614,19 +615,45 @@ class TestSafeTxProcessor(SafeTestCaseMixin, TestCase):
             internal_tx__value=0,
         )
 
-        with self.captureOnCommitCallbacks(execute=True):
-            self.tx_processor.process_decoded_transactions([exec_transaction_decoded])
+        # Load the decoded tx the same way the indexer does
+        pending_exec_transaction_decoded = (
+            InternalTxDecoded.objects.pending_for_safes().get(
+                pk=exec_transaction_decoded.pk
+            )
+        )
 
+        def build_event_payload_without_queries(sender, instance, **kwargs):
+            if sender is not MultisigTransaction:
+                return build_event_payload(sender, instance, **kwargs)
+            with self.assertNumQueries(0):
+                return build_event_payload(sender, instance, **kwargs)
+
+        with (
+            mock.patch(
+                "safe_transaction_service.history.signals.build_event_payload",
+                side_effect=build_event_payload_without_queries,
+            ),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            self.tx_processor.process_decoded_transactions(
+                [pending_exec_transaction_decoded]
+            )
+
+        payloads = [
+            payload
+            for call in send_events_mock.call_args_list
+            for payload in call.args[0]
+        ]
         self.assertEqual(
-            [
-                payload["type"]
-                for call in send_events_mock.call_args_list
-                for payload in call.args[0]
-            ],
+            [payload["type"] for payload in payloads],
             [
                 TransactionServiceEventType.EXECUTED_MULTISIG_TRANSACTION.name,
                 TransactionServiceEventType.NEW_CONFIRMATION.name,
             ],
+        )
+        self.assertEqual(
+            payloads[0]["executor"],
+            exec_transaction_decoded.internal_tx.ethereum_tx._from,
         )
 
     def test_tx_processor_get_execution_result(self):
