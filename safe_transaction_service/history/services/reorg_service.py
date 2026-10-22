@@ -9,6 +9,9 @@ from hexbytes import HexBytes
 from safe_eth.eth import EthereumClient, get_auto_ethereum_client
 from safe_eth.util.util import to_0x_hex_str
 
+from safe_transaction_service.policies.indexers import PolicyEventsIndexerProvider
+from safe_transaction_service.policies.models import SafePolicyGuard
+
 from ..indexers import (
     Erc20EventsIndexerProvider,
     InternalTxIndexerProvider,
@@ -71,6 +74,9 @@ class ReorgService:
             lambda block_number: SafeMasterCopy.objects.filter(
                 tx_block_number__gt=block_number
             ).update(tx_block_number=block_number),
+            lambda block_number: SafePolicyGuard.objects.filter(
+                tx_block_number__gt=block_number
+            ).update(tx_block_number=block_number),
             lambda block_number: int(
                 IndexingStatus.objects.set_erc20_721_indexing_status(
                     block_number, from_block_number=block_number
@@ -82,6 +88,7 @@ class ReorgService:
         self.indexer_providers = [
             Erc20EventsIndexerProvider,
             InternalTxIndexerProvider,
+            PolicyEventsIndexerProvider,
             ProxyFactoryIndexerProvider,
             SafeEventsIndexerProvider,
         ]
