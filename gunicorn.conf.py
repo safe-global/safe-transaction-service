@@ -1,12 +1,11 @@
 # SPDX-License-Identifier: FSL-1.1-MIT
+import os
+
 from gunicorn.arbiter import Arbiter
 from gunicorn.workers.base import Worker
 
-from config.gunicorn import (
-    gunicorn_request_timeout,
-    gunicorn_worker_connections,
-    gunicorn_workers,
-)
+# Do not import the `config` package here: it imports Celery, and this file runs
+# in the gunicorn master, before the gevent worker applies monkey patching
 
 max_requests = 100_000  # Restart a worker after it has processed a given number of requests (for memory leaks)
 max_requests_jitter = (
@@ -16,11 +15,11 @@ max_requests_jitter = (
 loglevel = "info"
 preload_app = False  # Load application code before the worker processes are forked (problems with gevent patching)
 # For timeout to work with gevent, a custom GeventWorker needs to be used
-timeout = gunicorn_request_timeout
+timeout = int(os.environ.get("WEB_WORKER_TIMEOUT", 60))
 
 worker_class = "gunicorn_custom_workers.MyGeventWorker"  # "gevent"
-worker_connections = gunicorn_worker_connections
-workers = gunicorn_workers
+worker_connections = int(os.environ.get("WEB_WORKER_CONNECTIONS", 100))
+workers = int(os.environ.get("WEB_CONCURRENCY", 2))
 
 
 def worker_exit(server: Arbiter, worker: Worker) -> None:
