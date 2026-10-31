@@ -334,6 +334,8 @@ class TestIndexService(EthereumTestCaseMixin, TestCase):
         for multisig_tx in (multisig_tx_api, multisig_tx_api_no_origin):
             multisig_tx.refresh_from_db()
             self.assertIsNone(multisig_tx.ethereum_tx_id)
+            self.assertIsNone(multisig_tx.failed)
+            self.assertIsNone(multisig_tx.payment)
 
         # Confirmations built from the execution signatures are deleted
         self.assertCountEqual(
