@@ -59,6 +59,7 @@ class JsonLog:
     message: str
     lineno: int
     contextMessage: ContextMessageLog | None = None
+    dd: dict | None = None
 
     def _remove_null_values_from_log(self, json_log: dict):
         """
@@ -77,6 +78,24 @@ class JsonLog:
 
 def get_milliseconds_now():
     return int(time.time() * 1000)
+
+
+def trace_correlation(record: logging.LogRecord) -> dict | None:
+    """
+    Datadog trace and span ids that ddtrace log injection adds to the record.
+    Datadog remaps ``dd.trace_id`` to the log's ``trace_id``, correlating it with
+    the request trace.
+
+    :param record:
+    :return: ``None`` outside of a trace
+    """
+    trace_id = getattr(record, "dd.trace_id", None)
+    if trace_id in (None, "0", 0):
+        return None
+    return {
+        "trace_id": str(trace_id),
+        "span_id": str(getattr(record, "dd.span_id", "")),
+    }
 
 
 def http_request_log(
@@ -144,6 +163,7 @@ class SafeJsonFormatter(logging.Formatter):
             message=record.getMessage(),
             contextMessage=context_message,
             lineno=record.lineno,
+            dd=trace_correlation(record),
         )
 
         return json_log.to_json()
