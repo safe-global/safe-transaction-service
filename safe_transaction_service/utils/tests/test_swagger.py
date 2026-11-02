@@ -1,6 +1,10 @@
 # SPDX-License-Identifier: FSL-1.1-MIT
+import json
+from io import StringIO
+
 from django.contrib.auth.models import AnonymousUser
 from django.core.cache import caches
+from django.core.management import call_command
 from django.test import RequestFactory, TestCase, override_settings
 from django.urls import clear_script_prefix, reverse
 
@@ -171,6 +175,16 @@ class TestSchemaView(TestCase):
         self.assertIn("servers", self.get_schema(prefix="/sch"))
 
         schema = self.get_schema()
+
+        self.assertNotIn("servers", schema)
+        self.assertIn(reverse("v1:history:about"), schema["paths"])
+
+    @override_settings(SCHEMA_SERVER_URL="https://api.example.com")
+    def test_spectacular_command_generates_schema(self):
+        """`manage.py spectacular` has no request, so it gets the unprefixed schema"""
+        output = StringIO()
+        call_command("spectacular", "--format", "openapi-json", stdout=output)
+        schema = json.loads(output.getvalue())
 
         self.assertNotIn("servers", schema)
         self.assertIn(reverse("v1:history:about"), schema["paths"])
