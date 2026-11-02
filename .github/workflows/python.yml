@@ -28,7 +28,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install uv
-        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           python-version: ${{ matrix.python-version }}
           enable-cache: true
@@ -85,7 +85,7 @@ jobs:
         docker run --detach --publish 8545:8545 --network ganache -e DOCKER=true trufflesuite/ganache:latest --defaultBalanceEther 10000 --gasLimit 10000000 -a 30 --chain.chainId 1337 --chain.networkId 1337 -d
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
     - name: Install uv
-      uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+      uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
       with:
         python-version: ${{ matrix.python-version }}
         enable-cache: true
@@ -121,7 +121,7 @@ jobs:
     needs:
       - linting
       - test-app
-    uses: docker/github-builder/.github/workflows/build.yml@4345a1cea1e4cfb65c8a5e2b1b80f9e630068827 # v1.18.0
+    uses: docker/github-builder/.github/workflows/build.yml@cbc9d42f8c89a55623392aadd03600965b80e963 # v1.18.1
     permissions:
       contents: read
       packages: write
