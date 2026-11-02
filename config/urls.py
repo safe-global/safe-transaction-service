@@ -6,6 +6,7 @@ from django.http import HttpResponse
 from django.urls import path, re_path
 from django.views import defaults as default_views
 from django.views.decorators.cache import cache_page
+from django.views.decorators.vary import vary_on_headers
 
 from drf_spectacular.views import (
     SpectacularAPIView,
@@ -16,26 +17,29 @@ from drf_spectacular.views import (
 from safe_transaction_service.utils.views import health
 
 schema_cache_timeout = 60 * 60 * 24 * 7  # 1 week
+
+
+def cached_schema_view(view):
+    # One cache entry per X-Forwarded-Prefix value: the paths and `servers` depend on it
+    return cache_page(schema_cache_timeout, cache="local_storage")(
+        vary_on_headers("X-Forwarded-Prefix")(view)
+    )
+
+
 swagger_urlpatterns = [
     path(
         "",
-        cache_page(schema_cache_timeout, cache="local_storage")(
-            SpectacularSwaggerView.as_view(url_name="schema-json")
-        ),
+        cached_schema_view(SpectacularSwaggerView.as_view(url_name="schema-json")),
         name="schema-swagger-ui",
     ),
     re_path(
         r"^schema\/(?:\?format=(?P<format>json|yaml))?$",
-        cache_page(schema_cache_timeout, cache="local_storage")(
-            SpectacularAPIView().as_view()
-        ),
+        cached_schema_view(SpectacularAPIView().as_view()),
         name="schema-json",
     ),
     path(
         "redoc/",
-        cache_page(schema_cache_timeout, cache="local_storage")(
-            SpectacularRedocView.as_view(url_name="schema-redoc")
-        ),
+        cached_schema_view(SpectacularRedocView.as_view(url_name="schema-redoc")),
         name="schema-redoc",
     ),
 ]

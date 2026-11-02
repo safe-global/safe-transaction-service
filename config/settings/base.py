@@ -783,7 +783,6 @@ REINDEX_CONTRACTS_METADATA_COUNTDOWN = env.int(
 )
 
 # DRF ESPECTACULAR
-# Server URL published in the OpenAPI schema, unset for no `servers`
 SCHEMA_SERVER_URL = env("SCHEMA_SERVER_URL", default=None)
 SPECTACULAR_SETTINGS = {
     "TITLE": "Safe Transaction Service",
@@ -796,9 +795,20 @@ SPECTACULAR_SETTINGS = {
     "DEFAULT_GENERATOR_CLASS": "safe_transaction_service.utils.swagger.IgnoreVersionSchemaGenerator",
     "POSTPROCESSING_HOOKS": [
         "drf_spectacular.contrib.djangorestframework_camel_case.camelize_serializer_fields",
-        "safe_transaction_service.utils.swagger.bearer_auth_and_server_hook",
+        "safe_transaction_service.utils.swagger.optional_bearer_auth_hook",
     ],
     "SORT_OPERATION_PARAMETERS": False,
+    # The Safe API key replaces the DRF authentication classes in the schema
+    "AUTHENTICATION_WHITELIST": [],
+    "APPEND_COMPONENTS": {
+        "securitySchemes": {
+            "bearerAuth": {
+                "type": "http",
+                "scheme": "bearer",
+                "description": "The Safe API key, sent as `Authorization: Bearer <key>`.",
+            }
+        }
+    },
 }
 
 BANNED_SAFES_CACHE_TTL = env.int(

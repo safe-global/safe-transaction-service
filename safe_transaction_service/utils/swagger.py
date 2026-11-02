@@ -31,24 +31,15 @@ class SafeAutoSchema(AutoSchema):
         return response_bodies
 
 
-def bearer_auth_and_server_hook(result, generator, request, public):
+def optional_bearer_auth_hook(result, generator, request, public):
     """
-    Document the optional Safe API key instead of the DRF authentication classes,
-    and the configured server URL
+    Make the Safe API key optional on every operation. drf-spectacular gives each
+    public operation `security: [{}]`, which would override the root `security`
     """
     for path_item in result["paths"].values():
         for operation in path_item.values():
             operation.pop("security", None)
-    result["components"]["securitySchemes"] = {
-        "bearerAuth": {
-            "type": "http",
-            "scheme": "bearer",
-            "description": "The Safe API key, sent as `Authorization: Bearer <key>`.",
-        }
-    }
     result["security"] = [{"bearerAuth": []}, {}]
-    if settings.SCHEMA_SERVER_URL:
-        result["servers"] = [{"url": settings.SCHEMA_SERVER_URL}]
     return result
 
 
@@ -58,7 +49,8 @@ class IgnoreVersionSchemaGenerator(SchemaGenerator):
         Generate the OpenAPI schema, adding a path prefix if present.
 
         If the 'HTTP_X_FORWARDED_PREFIX' header is set (usually by a proxy),
-        it adds that prefix to all paths in the schema.
+        it adds that prefix to all paths in the schema, and publishes
+        ``SCHEMA_SERVER_URL`` as the server for these paths.
 
         Args:
             request (HttpRequest, optional): The incoming request.
@@ -76,6 +68,9 @@ class IgnoreVersionSchemaGenerator(SchemaGenerator):
             for path_endpoint, endpoint_info in schema["paths"].items():
                 new_paths[f"{prefix}{path_endpoint}"] = endpoint_info
             schema["paths"] = new_paths
+            # Only the prefixed paths are the public ones
+            if settings.SCHEMA_SERVER_URL:
+                schema["servers"] = [{"url": settings.SCHEMA_SERVER_URL.rstrip("/")}]
 
         return schema
 
