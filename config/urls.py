@@ -39,7 +39,7 @@ swagger_urlpatterns = [
     ),
     path(
         "redoc/",
-        cached_schema_view(SpectacularRedocView.as_view(url_name="schema-redoc")),
+        cached_schema_view(SpectacularRedocView.as_view(url_name="schema-json")),
         name="schema-redoc",
     ),
 ]
