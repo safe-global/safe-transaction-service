@@ -710,9 +710,6 @@ SLACK_API_WEBHOOK = env("SLACK_API_WEBHOOK", default=None)
 # Events
 # ------------------------------------------------------------------------------
 EVENTS_QUEUE_URL = env("EVENTS_QUEUE_URL", default=None)
-EVENTS_QUEUE_EXCHANGE_NAME = env(
-    "EVENTS_QUEUE_EXCHANGE_NAME", default="safe-transaction-service-events"
-)
 EVENTS_QUEUE_TOPIC_EXCHANGE_NAME = env(
     "EVENTS_QUEUE_TOPIC_EXCHANGE_NAME",
     default="safe-transaction-service-events-with-topics",
