@@ -150,6 +150,22 @@ class TestSchemaView(TestCase):
         """Without `SCHEMA_SERVER_URL` there is no `servers`, also behind the proxy"""
         self.assertNotIn("servers", self.get_schema(prefix=PREFIX))
 
+    @override_settings(SCHEMA_SERVER_URL="https://api.example.com")
+    def test_schema_prefix_with_trailing_slash(self):
+        """A prefix that ends in `/` gives the same paths as the prefix without it"""
+        paths = self.get_schema(prefix=PREFIX + "/")["paths"]
+
+        self.assertIn(PREFIX + reverse("v1:history:about"), paths)
+        self.assertEqual([path for path in paths if "//" in path], [])
+
+    @override_settings(SCHEMA_SERVER_URL="https://api.example.com")
+    def test_schema_slash_prefix_is_no_prefix(self):
+        """A prefix of `/` gives the unprefixed schema, without `servers`"""
+        schema = self.get_schema(prefix="/")
+
+        self.assertNotIn("servers", schema)
+        self.assertIn(reverse("v1:history:about"), schema["paths"])
+
     @override_settings(
         SCHEMA_SERVER_URL="https://api.example.com", CACHES=LOCAL_STORAGE_LOCMEM
     )

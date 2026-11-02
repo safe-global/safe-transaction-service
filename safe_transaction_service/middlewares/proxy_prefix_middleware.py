@@ -18,8 +18,11 @@ class ProxyPrefixMiddleware:
         self.logger = logging.getLogger("ProxyPrefixMiddleware")
 
     def __call__(self, request: HttpRequest):
-        prefix = request.META.get("HTTP_X_FORWARDED_PREFIX", "")
+        prefix = request.META.get("HTTP_X_FORWARDED_PREFIX", "").rstrip("/")
         self.logger.debug(f"HTTP_X_FORWARDED_PREFIX:{prefix}")
+        if "HTTP_X_FORWARDED_PREFIX" in request.META:
+            # The schema generator and the schema cache key read the normalized value
+            request.META["HTTP_X_FORWARDED_PREFIX"] = prefix
         if prefix:
             request.META["SCRIPT_NAME"] = prefix
             set_script_prefix(prefix)
