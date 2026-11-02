@@ -61,11 +61,13 @@ class TestSafeAutoSchema(TestCase):
 class TestSchemaView(TestCase):
     def get_schema(self, prefix: str = "") -> dict:
         headers = {"X-Forwarded-Prefix": prefix} if prefix else {}
-        response = self.client.get(
-            reverse("schema-json") + "?format=json", headers=headers
-        )
-        # ProxyPrefixMiddleware sets the script prefix of the thread, used by reverse()
-        clear_script_prefix()
+        try:
+            response = self.client.get(
+                reverse("schema-json") + "?format=json", headers=headers
+            )
+        finally:
+            # ProxyPrefixMiddleware sets the script prefix of the thread, used by reverse()
+            clear_script_prefix()
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         return response.json()
 
@@ -194,6 +196,22 @@ class TestSchemaView(TestCase):
 
         self.assertNotIn("servers", schema)
         self.assertIn(reverse("v1:history:about"), schema["paths"])
+
+    @override_settings(
+        SCHEMA_SERVER_URL="https://api.example.com", CACHES=LOCAL_STORAGE_LOCMEM
+    )
+    def test_schema_cache_accepts_non_ascii_prefix(self):
+        """
+        A UTF-8 prefix, as WSGI passes it (ISO-8859-1 text), does not fail the cache key
+        (it was HTTP 500). The schema paths get the percent-encoded prefix. A prefix that
+        is not valid UTF-8 does not fail either
+        """
+        caches["local_storage"].clear()
+        schema = self.get_schema(prefix="/tx-s\u00c3\u00a9rvice/sep")
+
+        about = "/tx-s%C3%A9rvice/sep" + reverse("v1:history:about")
+        self.assertIn(about, schema["paths"])
+        self.get_schema(prefix="/tx-s\u00e9rvice/sep")
 
     @override_settings(SCHEMA_SERVER_URL="https://api.example.com")
     def test_spectacular_command_generates_schema(self):
