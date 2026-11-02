@@ -55,15 +55,27 @@ class TestSafeAutoSchema(TestCase):
 
 
 class TestSchemaView(TestCase):
-    def get_schema(self, prefix: str = "") -> dict:
+    def get(self, url: str, prefix: str = ""):
         headers = {"X-Forwarded-Prefix": prefix} if prefix else {}
-        response = self.client.get(
-            reverse("schema-json") + "?format=json", headers=headers
-        )
+        response = self.client.get(url, headers=headers)
         # ProxyPrefixMiddleware sets the script prefix of the thread, used by reverse()
         clear_script_prefix()
+        return response
+
+    def get_schema(self, prefix: str = "") -> dict:
+        response = self.get(reverse("schema-json") + "?format=json", prefix)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         return response.json()
+
+    def test_redoc_loads_the_schema(self):
+        """The Redoc page loads the schema document, behind the proxy too"""
+        for prefix in ("", PREFIX):
+            with self.subTest(prefix=prefix):
+                response = self.get(reverse("schema-redoc"), prefix)
+
+                self.assertContains(
+                    response, f'spec-url="{prefix}{reverse("schema-json")}"'
+                )
 
     def test_schema_declares_optional_bearer_api_key(self):
         """
