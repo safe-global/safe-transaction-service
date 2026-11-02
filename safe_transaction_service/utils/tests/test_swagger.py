@@ -1,11 +1,12 @@
 # SPDX-License-Identifier: FSL-1.1-MIT
 import json
+import re
 from io import StringIO
 
 from django.contrib.auth.models import AnonymousUser
 from django.core.cache import caches
 from django.core.management import call_command
-from django.test import RequestFactory, TestCase, override_settings
+from django.test import Client, RequestFactory, TestCase, override_settings
 from django.urls import clear_script_prefix, reverse
 
 from drf_spectacular.settings import patched_settings
@@ -81,6 +82,22 @@ class TestSchemaView(TestCase):
                 self.assertContains(
                     response, f'spec-url="{prefix}{reverse("schema-json")}"'
                 )
+
+    @override_settings(CACHES=LOCAL_STORAGE_LOCMEM)
+    def test_swagger_page_has_a_csrf_token_per_visitor(self):
+        """
+        Each visitor gets a CSRF cookie and an own token in the page. A cached page
+        gave later visitors the token of the first visitor and no cookie
+        """
+        caches["local_storage"].clear()
+        tokens = []
+        for _ in range(2):
+            response = Client().get(reverse("schema-swagger-ui"))
+
+            self.assertIn("csrftoken", response.cookies)
+            html = response.content.decode()
+            tokens.append(re.search(r'\["X-CSRFTOKEN"\] = "(\w+)"', html).group(1))
+        self.assertNotEqual(tokens[0], tokens[1])
 
     def test_schema_declares_optional_bearer_api_key(self):
         """
