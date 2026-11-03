@@ -783,6 +783,8 @@ REINDEX_CONTRACTS_METADATA_COUNTDOWN = env.int(
 )
 
 # DRF ESPECTACULAR
+# Server URL published in the OpenAPI schema, unset for no `servers`
+SCHEMA_SERVER_URL = env("SCHEMA_SERVER_URL", default=None)
 SPECTACULAR_SETTINGS = {
     "TITLE": "Safe Transaction Service",
     "DESCRIPTION": "API to keep track of transactions sent via Safe smart contracts",
@@ -793,7 +795,8 @@ SPECTACULAR_SETTINGS = {
     "SCHEMA_PATH_PREFIX": "/api/v[0-9]",
     "DEFAULT_GENERATOR_CLASS": "safe_transaction_service.utils.swagger.IgnoreVersionSchemaGenerator",
     "POSTPROCESSING_HOOKS": [
-        "drf_spectacular.contrib.djangorestframework_camel_case.camelize_serializer_fields"
+        "drf_spectacular.contrib.djangorestframework_camel_case.camelize_serializer_fields",
+        "safe_transaction_service.utils.swagger.bearer_auth_and_server_hook",
     ],
     "SORT_OPERATION_PARAMETERS": False,
 }

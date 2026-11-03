@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: FSL-1.1-MIT
+from drf_spectacular.utils import extend_schema
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.generics import ListAPIView
 from rest_framework.permissions import IsAuthenticated
@@ -10,9 +11,9 @@ from safe_transaction_service.analytics.services.analytics_service import (
 )
 
 
+@extend_schema(exclude=True)
 class AnalyticsMultisigTxsByOriginListView(ListAPIView):
     pagination_class = None
-    swagger_schema = None
     renderer_classes = (JSONRenderer,)
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]

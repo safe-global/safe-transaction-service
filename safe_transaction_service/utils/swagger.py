@@ -3,6 +3,8 @@ import logging
 import os
 import re
 
+from django.conf import settings
+
 from drf_spectacular.drainage import add_trace_message, error, get_override, warn
 from drf_spectacular.generators import SchemaGenerator
 from drf_spectacular.openapi import AutoSchema
@@ -27,6 +29,27 @@ class SafeAutoSchema(AutoSchema):
                 {"description": "Safe is unavailable for legal reasons (banned)"},
             )
         return response_bodies
+
+
+def bearer_auth_and_server_hook(result, generator, request, public):
+    """
+    Document the optional Safe API key instead of the DRF authentication classes,
+    and the configured server URL
+    """
+    for path_item in result["paths"].values():
+        for operation in path_item.values():
+            operation.pop("security", None)
+    result["components"]["securitySchemes"] = {
+        "bearerAuth": {
+            "type": "http",
+            "scheme": "bearer",
+            "description": "The Safe API key, sent as `Authorization: Bearer <key>`.",
+        }
+    }
+    result["security"] = [{"bearerAuth": []}, {}]
+    if settings.SCHEMA_SERVER_URL:
+        result["servers"] = [{"url": settings.SCHEMA_SERVER_URL}]
+    return result
 
 
 class IgnoreVersionSchemaGenerator(SchemaGenerator):
