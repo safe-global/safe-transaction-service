@@ -106,6 +106,18 @@ class TestSchemaView(TestCase):
         ]
         self.assertEqual(protected, [])
 
+    def test_schema_conventional_aliases(self):
+        """The aliases serve the same JSON schema as `schema/`"""
+        schema = self.get_schema()
+        for url_name in ("schema-openapi-json", "schema-openapi-json-v1"):
+            with self.subTest(url_name=url_name):
+                response = self.client.get(reverse(url_name))
+                self.assertEqual(response.status_code, status.HTTP_200_OK)
+                self.assertEqual(
+                    response["Content-Type"], "application/vnd.oai.openapi+json"
+                )
+                self.assertEqual(response.json(), schema)
+
     def test_schema_excludes_analytics(self):
         """The admin-only analytics endpoint is not in the public schema"""
         paths = self.get_schema()["paths"]
