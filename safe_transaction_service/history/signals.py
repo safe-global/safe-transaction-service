@@ -55,6 +55,8 @@ def bind_confirmation(
 ) -> None:
     """
     When a `MultisigConfirmation` is saved, it tries to bind it to an existing `MultisigTransaction`, and the opposite.
+    A bound `MultisigTransaction` becomes trusted. Events are not published for untrusted transactions, so when a
+    pending transaction becomes trusted its `PENDING_MULTISIG_TRANSACTION` event is published here.
 
     :param sender: Could be MultisigConfirmation or MultisigTransaction
     :param instance: Instance of MultisigConfirmation or `MultisigTransaction`
@@ -82,22 +84,38 @@ def bind_confirmation(
             instance.trusted = True
             instance.modified = now
     elif sender == MultisigConfirmation:
-        if instance.multisig_transaction_id:
-            # Update modified on MultisigTransaction if one confirmation is added. Tx will now be trusted
-            MultisigTransaction.objects.filter(
-                safe_tx_hash=instance.multisig_transaction_id
-            ).update(modified=instance.created, trusted=True)
-        elif instance.multisig_transaction_hash:
-            MultisigTransaction.objects.filter(
-                safe_tx_hash=instance.multisig_transaction_hash
-            ).update(modified=instance.created, trusted=True)
+        safe_tx_hash = (
+            instance.multisig_transaction_id or instance.multisig_transaction_hash
+        )
+        if not safe_tx_hash:
+            return None
+
+        multisig_txs = MultisigTransaction.objects.filter(safe_tx_hash=safe_tx_hash)
+        # Only the first confirmation flips `trusted`, so the conditional update
+        # tells whether this confirmation is the one making the tx trusted
+        became_trusted = multisig_txs.not_trusted().update(
+            modified=instance.created, trusted=True
+        )
+        if not became_trusted:
+            multisig_txs.update(modified=instance.created)
+
+        if not instance.multisig_transaction_id:
             # Use a subquery so the FK update only runs if the MultisigTransaction
             # exists, regardless of whether the previous update changed any values
             MultisigConfirmation.objects.filter(pk=instance.pk).filter(
-                multisig_transaction_hash__in=MultisigTransaction.objects.filter(
-                    safe_tx_hash=instance.multisig_transaction_hash
-                ).values("safe_tx_hash")
-            ).update(multisig_transaction_id=instance.multisig_transaction_hash)
+                multisig_transaction_hash__in=multisig_txs.values("safe_tx_hash")
+            ).update(multisig_transaction_id=safe_tx_hash)
+
+        if became_trusted and (multisig_tx := multisig_txs.not_executed().first()):
+            # The flip only happens once per transaction, so reindexing cannot
+            # publish this event twice
+            _process_event(
+                MultisigTransaction,
+                multisig_tx,
+                created=False,
+                deleted=False,
+                force_publish=True,
+            )
 
 
 @receiver(
@@ -147,6 +165,7 @@ def _process_event(
     | SafeContract,
     created: bool,
     deleted: bool,
+    force_publish: bool = False,
 ) -> None:
     """
     Build the event payloads for the instance and schedule their publication
@@ -159,6 +178,8 @@ def _process_event(
     :param instance:
     :param created:
     :param deleted:
+    :param force_publish: publish even if `is_relevant_event` rejects the event.
+        `DISABLE_SERVICE_EVENTS` and banned Safes still apply
     :return:
     """
     if settings.DISABLE_SERVICE_EVENTS:
@@ -176,7 +197,7 @@ def _process_event(
 
     # Skip payload generation for events that won't be emitted anyway
     # (for example, old/reindexed txs).
-    if not is_relevant_event(sender, instance, created):
+    if not force_publish and not is_relevant_event(sender, instance, created):
         logger.debug(
             "Skipping non-relevant event for created=%s object=%s",
             created,

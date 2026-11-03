@@ -48,6 +48,7 @@ from ..signals import (
 from .factories import (
     ERC20TransferFactory,
     ERC721TransferFactory,
+    EthereumTxFactory,
     InternalTxFactory,
     ModuleTransactionFactory,
     MultisigConfirmationFactory,
@@ -497,14 +498,170 @@ class TestSignals(SafeTestCaseMixin, TestCase):
                 trusted=False, ethereum_tx=None, safe_tx_hash=known_hash
             )
 
-        emitted_types = [
-            payload["type"]
+        self.assertIn(
+            TransactionServiceEventType.PENDING_MULTISIG_TRANSACTION.name,
+            self._emitted_types(send_events_mock),
+        )
+
+    @staticmethod
+    def _emitted_payloads(send_events_mock: MagicMock) -> list[dict]:
+        return [
+            payload
             for call in send_events_mock.call_args_list
             for payload in call.args[0]
         ]
-        self.assertIn(
-            TransactionServiceEventType.PENDING_MULTISIG_TRANSACTION.name, emitted_types
+
+    def _emitted_types(self, send_events_mock: MagicMock) -> list[str]:
+        return [payload["type"] for payload in self._emitted_payloads(send_events_mock)]
+
+    @staticmethod
+    def _add_offchain_confirmation(
+        multisig_tx: MultisigTransaction,
+    ) -> MultisigConfirmation:
+        return MultisigConfirmationFactory(
+            multisig_transaction=multisig_tx,
+            multisig_transaction_hash=multisig_tx.safe_tx_hash,
+            ethereum_tx=None,
+            signature_type=SafeSignatureType.EOA.value,
         )
+
+    @mock.patch.object(QueueService, "send_events")
+    def test_pending_event_emitted_when_offchain_confirmation_makes_tx_trusted(
+        self, send_events_mock: MagicMock
+    ):
+        """
+        An untrusted pending transaction gets its first off-chain confirmation,
+        bound by `multisig_transaction_id`. The transaction becomes trusted and
+        exactly one PENDING_MULTISIG_TRANSACTION event is published, together
+        with the NEW_CONFIRMATION one. Later confirmations do not publish the
+        pending event again.
+        """
+        with self.captureOnCommitCallbacks(execute=True):
+            multisig_tx = MultisigTransactionFactory(trusted=False, ethereum_tx=None)
+        # Untrusted proposals are not published
+        send_events_mock.assert_not_called()
+
+        with self.captureOnCommitCallbacks(execute=True):
+            self._add_offchain_confirmation(multisig_tx)
+        multisig_tx.refresh_from_db()
+        self.assertTrue(multisig_tx.trusted)
+
+        self.assertEqual(
+            self._emitted_types(send_events_mock),
+            [
+                TransactionServiceEventType.PENDING_MULTISIG_TRANSACTION.name,
+                TransactionServiceEventType.NEW_CONFIRMATION.name,
+            ],
+        )
+        self.assertEqual(
+            self._emitted_payloads(send_events_mock)[0],
+            build_event_payload(MultisigTransaction, multisig_tx)[0],
+        )
+
+        send_events_mock.reset_mock()
+        with self.captureOnCommitCallbacks(execute=True):
+            self._add_offchain_confirmation(multisig_tx)
+        self.assertEqual(
+            self._emitted_types(send_events_mock),
+            [TransactionServiceEventType.NEW_CONFIRMATION.name],
+        )
+
+    @mock.patch.object(QueueService, "send_events")
+    def test_pending_event_emitted_when_approved_hash_makes_tx_trusted(
+        self, send_events_mock: MagicMock
+    ):
+        """
+        An on-chain APPROVED_HASH confirmation is indexed with only
+        `multisig_transaction_hash`. Binding it to the untrusted pending
+        transaction makes the transaction trusted and publishes exactly one
+        PENDING_MULTISIG_TRANSACTION event, even when the indexer is behind and
+        the block is older than the event time window.
+        """
+        with self.captureOnCommitCallbacks(execute=True):
+            multisig_tx = MultisigTransactionFactory(trusted=False, ethereum_tx=None)
+        send_events_mock.assert_not_called()
+
+        # `create` saves the instance a second time after the post generation
+        # hooks, and that second save would overwrite the FK bound by the signal
+        confirmation = MultisigConfirmationFactory.build(
+            ethereum_tx=EthereumTxFactory(),
+            multisig_transaction=None,
+            multisig_transaction_hash=multisig_tx.safe_tx_hash,
+            signature_type=SafeSignatureType.APPROVED_HASH.value,
+            safe_address=multisig_tx.safe,
+            # Indexed confirmations use the block timestamp. A lagging indexer
+            # stores it older than the 60 minutes window of `is_relevant_event`
+            created=timezone.now() - timedelta(hours=2),
+        )
+        with self.captureOnCommitCallbacks(execute=True):
+            confirmation.save()
+        confirmation.refresh_from_db()
+        self.assertEqual(confirmation.multisig_transaction_id, multisig_tx.safe_tx_hash)
+        multisig_tx.refresh_from_db()
+        self.assertTrue(multisig_tx.trusted)
+
+        # NEW_CONFIRMATION for the old block is still skipped by the time window
+        self.assertEqual(
+            self._emitted_types(send_events_mock),
+            [TransactionServiceEventType.PENDING_MULTISIG_TRANSACTION.name],
+        )
+        self.assertEqual(
+            self._emitted_payloads(send_events_mock)[0],
+            build_event_payload(MultisigTransaction, multisig_tx)[0],
+        )
+
+    @mock.patch.object(QueueService, "send_events")
+    def test_no_pending_event_for_new_confirmation_of_trusted_tx(
+        self, send_events_mock: MagicMock
+    ):
+        """
+        A new confirmation for an already trusted pending transaction only
+        publishes NEW_CONFIRMATION. The pending event was already published
+        when the transaction was proposed.
+        """
+        multisig_tx = MultisigTransactionFactory(trusted=True, ethereum_tx=None)
+
+        with self.captureOnCommitCallbacks(execute=True):
+            self._add_offchain_confirmation(multisig_tx)
+        self.assertEqual(
+            self._emitted_types(send_events_mock),
+            [TransactionServiceEventType.NEW_CONFIRMATION.name],
+        )
+
+    @mock.patch.object(QueueService, "send_events")
+    def test_no_pending_event_for_confirmation_of_executed_tx(
+        self, send_events_mock: MagicMock
+    ):
+        """
+        A confirmation making an executed transaction trusted must not publish
+        a PENDING_MULTISIG_TRANSACTION event.
+        """
+        multisig_tx = MultisigTransactionFactory(trusted=False)
+        self.assertTrue(multisig_tx.executed)
+
+        with self.captureOnCommitCallbacks(execute=True):
+            self._add_offchain_confirmation(multisig_tx)
+        multisig_tx.refresh_from_db()
+        self.assertTrue(multisig_tx.trusted)
+        self.assertEqual(
+            self._emitted_types(send_events_mock),
+            [TransactionServiceEventType.NEW_CONFIRMATION.name],
+        )
+
+    @mock.patch.object(QueueService, "send_events")
+    def test_no_pending_event_for_confirmation_of_unknown_tx(
+        self, send_events_mock: MagicMock
+    ):
+        """
+        A confirmation for a transaction not stored in the service publishes
+        nothing from the binding logic.
+        """
+        with self.captureOnCommitCallbacks(execute=True):
+            MultisigConfirmationFactory(
+                multisig_transaction=None,
+                signature_type=SafeSignatureType.APPROVED_HASH.value,
+            )
+        self.assertEqual(self._emitted_types(send_events_mock), [])
 
     @mock.patch.object(QueueService, "send_events")
     def test_delegates_signals_are_correctly_fired(self, send_events_mock: MagicMock):
