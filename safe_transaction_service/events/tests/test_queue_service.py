@@ -13,7 +13,6 @@ from kombu.pools import get_limit
 from ..services import queue_service as queue_service_module
 from ..services.queue_service import (
     EVENTS_APP_ID,
-    LegacyExchange,
     QueueService,
     close_queue_service,
     get_queue_service,
@@ -24,13 +23,15 @@ class TestQueueService(TestCase):
     def setUp(self):
         self.conn = Connection(settings.EVENTS_QUEUE_URL)
         exchange = Exchange(
-            settings.EVENTS_QUEUE_EXCHANGE_NAME, type="fanout", durable=True
+            settings.EVENTS_QUEUE_TOPIC_EXCHANGE_NAME, type="topic", durable=True
         )
         # exclusive=True: RabbitMQ 4.x deprecated non-durable non-exclusive queues
         # (transient_nonexcl_queues). Exclusive queues are still allowed, are
         # auto-deleted when the connection closes, and still receive messages
-        # routed from the fanout exchange by the broker.
-        self.test_queue = Queue("test_queue", exchange=exchange, exclusive=True)
+        # routed from the topic exchange by the broker.
+        self.test_queue = Queue(
+            "test_queue", exchange=exchange, routing_key="#", exclusive=True
+        )
         with self.conn.channel() as channel:
             bound = self.test_queue(channel)
             bound.declare()
@@ -185,35 +186,50 @@ class TestQueueService(TestCase):
         self.addCleanup(queue_service.close)
         return queue_service
 
-    def _spy_bind_to(self):
-        return mock.patch.object(
-            LegacyExchange, "bind_to", autospec=True, side_effect=Exchange.bind_to
-        )
-
     def test_init_does_not_open_connections(self):
         self.assertEqual(self._make_queue_service()._open_connections(), [])
 
-    def test_exchanges_restored_after_broker_loses_them(self):
+    def test_exchange_restored_after_broker_loses_it(self):
+        """
+        After a broker restart, the next publish declares the exchange again.
+        """
         queue_service = self._make_queue_service()
         queue_service.send_event({"message": "before"})
         self.assertEqual(self._get_message(), {"message": "before"})
 
-        # Broker restart: exchanges, bindings and sockets are lost, but kombu
-        # still sees the connection as open with its declarations cached
+        # Broker restart: the exchange, its bindings and the sockets are lost,
+        # but kombu still sees the connection as open with its declarations
+        # cached
+        exchange = Exchange(settings.EVENTS_QUEUE_TOPIC_EXCHANGE_NAME)
         with self.conn.channel() as channel:
-            Exchange(settings.EVENTS_QUEUE_TOPIC_EXCHANGE_NAME)(channel).delete()
-            Exchange(settings.EVENTS_QUEUE_EXCHANGE_NAME)(channel).delete()
+            exchange(channel).delete()
         (conn,) = queue_service._open_connections()
         conn.connection.transport.sock.close()
-        with self.conn.channel() as channel:
-            self.test_queue(channel).declare()
 
+        # Nothing else declares the exchange: `test_queue.declare()` would
+        # create it too
         self.assertEqual(
             queue_service.send_events([{"message": "after 1"}, {"message": "after 2"}]),
             2,
         )
-        self.assertEqual(self._get_message(), {"message": "after 1"})
-        self.assertEqual(self._get_message(), {"message": "after 2"})
+        with self.conn.channel() as channel:
+            exchange(channel).declare(passive=True)
+            self.test_queue(channel).declare()
+
+        self.assertEqual(queue_service.send_event({"message": "after 3"}), 1)
+        self.assertEqual(self._get_message(), {"message": "after 3"})
+
+    def test_exchange_declared_once_per_connection(self):
+        """
+        The exchange is declared on the first publish of a connection only.
+        """
+        queue_service = self._make_queue_service()
+        with mock.patch.object(
+            Exchange, "declare", autospec=True, side_effect=Exchange.declare
+        ) as declare_mock:
+            queue_service.send_event({"message": "1"})
+            queue_service.send_event({"message": "2"})
+        declare_mock.assert_called_once()
 
     def test_publish_retry_is_logged(self):
         queue_service = self._make_queue_service()
@@ -246,22 +262,17 @@ class TestQueueService(TestCase):
         self.assertIn("Failed to publish event", logs.output[2])
         self.assertEqual(len(queue_service.unsent_events), 1)
 
-    def test_legacy_binding_declared_once_per_connection(self):
+    def test_declare_failure_buffers_and_retries(self):
+        """
+        A failing exchange declaration buffers the event, and the next publish
+        sends both events in order.
+        """
         queue_service = self._make_queue_service()
-        with self._spy_bind_to() as bind_to_mock:
-            queue_service.send_event({"message": "1"})
-            queue_service.send_event({"message": "2"})
-        bind_to_mock.assert_called_once()
-
-    def test_bind_failure_buffers_and_retries(self):
-        queue_service = self._make_queue_service()
-        with mock.patch.object(LegacyExchange, "bind_to", side_effect=OSError):
+        with mock.patch.object(Exchange, "declare", side_effect=OSError):
             self.assertEqual(queue_service.send_event({"message": "1"}), 0)
         self.assertEqual(len(queue_service.unsent_events), 1)
 
-        with self._spy_bind_to() as bind_to_mock:
-            self.assertEqual(queue_service.send_event({"message": "2"}), 2)
-        bind_to_mock.assert_called_once()
+        self.assertEqual(queue_service.send_event({"message": "2"}), 2)
         self.assertEqual(self._get_message(), {"message": "2"})
         self.assertEqual(self._get_message(), {"message": "1"})
 

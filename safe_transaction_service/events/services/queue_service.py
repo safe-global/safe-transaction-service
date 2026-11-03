@@ -1,7 +1,6 @@
 # SPDX-License-Identifier: FSL-1.1-MIT
 import logging
 import socket
-from collections.abc import Callable
 from functools import cache
 from typing import Any
 
@@ -13,7 +12,6 @@ import orjson
 from kombu import Connection, Exchange, Producer
 from kombu.connection import ConnectionPool
 from kombu.pools import ProducerPool, get_limit
-from kombu.transport.base import StdChannel
 from kombu.utils.functional import lazy
 
 logger = logging.getLogger(__name__)
@@ -25,31 +23,6 @@ EVENTS_APP_ID = "safe-transaction-service"
 
 # A broker that does not answer must not block the process exit
 CLOSE_TIMEOUT_SECONDS = 5
-
-
-class LegacyExchange(Exchange):
-    """
-    Legacy fanout exchange, bound as a destination of the topic exchange
-    (``routing_key="#"``) so its consumers keep receiving every event. The
-    binding is part of the declaration, so kombu creates it again on every
-    new connection.
-    """
-
-    attrs: tuple[tuple[str, Callable[[Any], Any] | None], ...] = Exchange.attrs + (
-        ("source", None),
-    )
-    source: Exchange
-
-    def declare(
-        self,
-        nowait: bool = False,
-        passive: bool | None = None,
-        channel: StdChannel | None = None,
-    ) -> None:
-        super().declare(nowait=nowait, passive=passive, channel=channel)
-        self.bind_to(
-            exchange=self.source, routing_key="#", nowait=nowait, channel=channel
-        )
 
 
 class BaseQueueService:
@@ -108,12 +81,6 @@ class QueueService(BaseQueueService):
             settings.EVENTS_QUEUE_TOPIC_EXCHANGE_NAME,
             type="topic",
             durable=True,
-        )
-        self.legacy_exchange = LegacyExchange(
-            settings.EVENTS_QUEUE_EXCHANGE_NAME,
-            type="fanout",
-            durable=True,
-            source=self.exchange,
         )
         connection = Connection(
             settings.EVENTS_QUEUE_URL,
@@ -186,7 +153,7 @@ class QueueService(BaseQueueService):
                 exchange=self.exchange,
                 # Cached per connection by kombu, declared again when `retry`
                 # reconnects, also in the middle of a batch
-                declare=[self.exchange, self.legacy_exchange],
+                declare=[self.exchange],
                 routing_key=routing_key,
                 content_type="application/json",
                 content_encoding="utf-8",
