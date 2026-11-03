@@ -3,6 +3,8 @@ import logging
 import os
 import re
 
+from django.conf import settings
+
 from drf_spectacular.drainage import add_trace_message, error, get_override, warn
 from drf_spectacular.generators import SchemaGenerator
 from drf_spectacular.openapi import AutoSchema
@@ -29,13 +31,26 @@ class SafeAutoSchema(AutoSchema):
         return response_bodies
 
 
+def optional_bearer_auth_hook(result, generator, request, public):
+    """
+    Make the Safe API key optional on every operation. drf-spectacular gives each
+    public operation `security: [{}]`, which would override the root `security`
+    """
+    for path_item in result["paths"].values():
+        for operation in path_item.values():
+            operation.pop("security", None)
+    result["security"] = [{"bearerAuth": []}, {}]
+    return result
+
+
 class IgnoreVersionSchemaGenerator(SchemaGenerator):
     def get_schema(self, request=None, public=False):
         """
         Generate the OpenAPI schema, adding a path prefix if present.
 
         If the 'HTTP_X_FORWARDED_PREFIX' header is set (usually by a proxy),
-        it adds that prefix to all paths in the schema.
+        it adds that prefix to all paths in the schema, and publishes
+        ``SCHEMA_SERVER_URL`` as the server for these paths.
 
         Args:
             request (HttpRequest, optional): The incoming request.
@@ -53,6 +68,9 @@ class IgnoreVersionSchemaGenerator(SchemaGenerator):
             for path_endpoint, endpoint_info in schema["paths"].items():
                 new_paths[f"{prefix}{path_endpoint}"] = endpoint_info
             schema["paths"] = new_paths
+            # Only the prefixed paths are the public ones
+            if settings.SCHEMA_SERVER_URL:
+                schema["servers"] = [{"url": settings.SCHEMA_SERVER_URL.rstrip("/")}]
 
         return schema
 
