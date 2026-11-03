@@ -90,23 +90,31 @@ def bind_confirmation(
         if not safe_tx_hash:
             return None
 
-        multisig_txs = MultisigTransaction.objects.filter(safe_tx_hash=safe_tx_hash)
+        multisig_tx_queryset = MultisigTransaction.objects.filter(
+            safe_tx_hash=safe_tx_hash
+        )
         # Only the first confirmation flips `trusted`, so the conditional update
         # tells whether this confirmation is the one making the tx trusted
-        became_trusted = multisig_txs.not_trusted().update(
-            modified=instance.created, trusted=True
+        became_trusted = bool(
+            multisig_tx_queryset.not_trusted().update(
+                modified=instance.created, trusted=True
+            )
         )
         if not became_trusted:
-            multisig_txs.update(modified=instance.created)
+            multisig_tx_queryset.update(modified=instance.created)
 
         if not instance.multisig_transaction_id:
             # Use a subquery so the FK update only runs if the MultisigTransaction
             # exists, regardless of whether the previous update changed any values
             MultisigConfirmation.objects.filter(pk=instance.pk).filter(
-                multisig_transaction_hash__in=multisig_txs.values("safe_tx_hash")
+                multisig_transaction_hash__in=multisig_tx_queryset.values(
+                    "safe_tx_hash"
+                )
             ).update(multisig_transaction_id=safe_tx_hash)
 
-        if became_trusted and (multisig_tx := multisig_txs.not_executed().first()):
+        if became_trusted and (
+            multisig_tx := multisig_tx_queryset.not_executed().first()
+        ):
             # The flip only happens once per transaction, so reindexing cannot
             # publish this event twice
             _process_event(
