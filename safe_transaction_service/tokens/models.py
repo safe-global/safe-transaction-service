@@ -101,7 +101,7 @@ class TokenManager(models.Manager):
                         symbol="ENS",
                         logo="tokens/logos/ENS.png",
                         decimals=None,
-                        trusted=True,
+                        trusted_admin=True,
                     )
             except IntegrityError:
                 # Token was created by another worker in the meantime
@@ -253,7 +253,14 @@ class Token(models.Model):
         default=False, help_text="Spam and trusted cannot be both True"
     )
     trusted = models.BooleanField(
-        default=False, help_text="Spam and trusted cannot be both True"
+        default=False,
+        help_text="Set from the configured token lists on every daily update. "
+        "Spam and trusted cannot be both True",
+    )
+    trusted_admin = models.BooleanField(
+        default=False,
+        help_text="Keep the token trusted regardless of the configured token "
+        "lists. Not reset by the daily update",
     )
     copy_price = EthereumAddressBinaryField(
         null=True, blank=True, help_text="If provided, copy the price from the token"
@@ -281,8 +288,16 @@ class Token(models.Model):
         else:
             return f"{spam_text}ERC20 - {self.name} - {self.address}"
 
+    def save(self, *args, **kwargs):
+        # Clearing it does not untrust, `trusted` belongs to the daily list task
+        if self.trusted_admin:
+            self.trusted = True
+        return super().save(*args, **kwargs)
+
     def clean(self):
         if self.trusted and self.spam:
+            raise ValidationError("Spam and trusted cannot be both `True`")
+        if self.trusted_admin and self.spam:
             raise ValidationError("Spam and trusted cannot be both `True`")
 
     def is_erc20(self):
@@ -293,7 +308,8 @@ class Token(models.Model):
 
     def set_trusted(self) -> None:
         self.trusted = True
-        return self.save(update_fields=["trusted"])
+        self.trusted_admin = True
+        return self.save(update_fields=["trusted", "trusted_admin"])
 
     def set_spam(self) -> None:
         self.spam = True

@@ -142,3 +142,56 @@ class TestTasks(TestCase):
         self.assertTrue(long_token.trusted)
         self.assertEqual(long_token.name, long_name[:60])
         self.assertEqual(long_token.symbol, long_symbol[:60])
+
+    @mock.patch(
+        "safe_transaction_service.tokens.tasks.get_ethereum_network",
+        return_value=EthereumNetwork.MAINNET,
+    )
+    @mock.patch.object(
+        TokenList, "get_tokens", autospec=True, return_value=token_list_mock["tokens"]
+    )
+    def test_update_token_info_from_token_list_task_keeps_trusted_admin(
+        self, get_tokens_mock: MagicMock, get_ethereum_network_mock: MagicMock
+    ):
+        TokenListFactory()
+        # Manually trusted and not on the token list, trust must survive the task
+        manually_trusted = TokenFactory(trusted_admin=True)
+        # Manually trusted and also on the token list, metadata is still refreshed
+        manually_trusted_on_list = TokenFactory(
+            address="0x4A64515E5E1d1073e83f30cB97BEd20400b66E10",
+            logo=None,
+            name="Old Name",
+            symbol="OLD",
+            trusted_admin=True,
+        )
+        # Not curated, it just follows the token list
+        from_list = TokenFactory(address="0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599")
+
+        self.assertEqual(update_token_info_from_token_list_task.delay().result, 2)
+
+        manually_trusted.refresh_from_db()
+        self.assertTrue(manually_trusted.trusted)
+
+        manually_trusted_on_list.refresh_from_db()
+        self.assertTrue(manually_trusted_on_list.trusted)
+        self.assertEqual(manually_trusted_on_list.name, "Wrapped ZEC")
+        self.assertEqual(manually_trusted_on_list.symbol, "WZEC")
+
+        from_list.refresh_from_db()
+        self.assertTrue(from_list.trusted)
+
+        # A token dropped from the list loses `trusted`, unless manually curated
+        get_tokens_mock.return_value = [
+            token
+            for token in token_list_mock["tokens"]
+            # Addresses on the lists are not checksummed
+            if token["address"].lower() != from_list.address.lower()
+        ]
+        self.assertEqual(update_token_info_from_token_list_task.delay().result, 1)
+
+        from_list.refresh_from_db()
+        self.assertFalse(from_list.trusted)
+        manually_trusted.refresh_from_db()
+        self.assertTrue(manually_trusted.trusted)
+        manually_trusted_on_list.refresh_from_db()
+        self.assertTrue(manually_trusted_on_list.trusted)

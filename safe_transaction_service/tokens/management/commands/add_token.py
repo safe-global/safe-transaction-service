@@ -69,7 +69,7 @@ class Command(BaseCommand):
                     name=info.name,
                     symbol=info.symbol,
                     decimals=decimals,
-                    trusted=True,
+                    trusted_admin=True,
                 )
                 self.stdout.write(
                     self.style.SUCCESS(
