@@ -308,6 +308,10 @@ class Token(models.Model):
 
     def set_trusted(self) -> None:
         self.trusted = True
+        return self.save(update_fields=["trusted"])
+
+    def set_trusted_admin(self) -> None:
+        self.trusted = True
         self.trusted_admin = True
         return self.save(update_fields=["trusted", "trusted_admin"])
 

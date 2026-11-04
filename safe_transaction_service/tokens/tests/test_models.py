@@ -87,7 +87,13 @@ class TestModels(TestCase):
         token = TokenFactory(trusted=False)
         self.assertFalse(token.trusted_admin)
 
+        # `set_trusted` is for automatic sources, it does not curate
         token.set_trusted()
+        token.refresh_from_db()
+        self.assertTrue(token.trusted)
+        self.assertFalse(token.trusted_admin)
+
+        token.set_trusted_admin()
         token.refresh_from_db()
         self.assertTrue(token.trusted)
         self.assertTrue(token.trusted_admin)

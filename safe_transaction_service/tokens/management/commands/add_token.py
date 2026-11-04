@@ -38,8 +38,8 @@ class Command(BaseCommand):
                         f"{token_address} already exists"
                     )
                 )
-                if not token.trusted:  # Mark token as trusted if it's not
-                    token.set_trusted()
+                if not token.trusted_admin:  # Mark token as trusted if it's not
+                    token.set_trusted_admin()
                     self.stdout.write(
                         self.style.SUCCESS(f"Marking token {token_address} as trusted")
                     )
