@@ -39,18 +39,12 @@ swagger_urlpatterns = [
         schema_json_view,
         name="schema-json",
     ),
-    # Conventional aliases of the schema, so agents find it without knowing `schema/`
+    # Conventional alias of the schema, so agents find it without knowing `schema/`
     path(
         "openapi.json",
         schema_json_view,
         {"format": "json"},
         name="schema-openapi-json",
-    ),
-    path(
-        "api/v1/openapi.json",
-        schema_json_view,
-        {"format": "json"},
-        name="schema-openapi-json-v1",
     ),
     path(
         "redoc/",
