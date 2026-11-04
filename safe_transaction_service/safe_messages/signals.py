@@ -6,8 +6,10 @@ from django.db.models import Model
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
-from safe_transaction_service.history.services.event_service import build_event_payload
-from safe_transaction_service.history.signals import send_payloads_on_commit
+from safe_transaction_service.history.services.event_service import (
+    build_event_payload,
+    send_payloads_on_commit,
+)
 from safe_transaction_service.safe_messages.models import (
     SafeMessage,
     SafeMessageConfirmation,
