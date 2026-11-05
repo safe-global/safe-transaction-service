@@ -16,6 +16,7 @@ class TokenFactory(DjangoModelFactory):
     decimals = 18
     logo = factory.django.ImageField(color="yellow")
     trusted = False
+    trusted_admin = False
     spam = False
     copy_price = None
 

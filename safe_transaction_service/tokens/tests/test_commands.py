@@ -62,6 +62,7 @@ class TestCommands(EthereumTestCaseMixin, TestCase):
         self.assertIn("already exists", buf.getvalue())
         token.refresh_from_db()
         self.assertTrue(token.trusted)
+        self.assertTrue(token.trusted_admin)
 
         erc20 = deploy_erc20(
             self.ethereum_client.w3,
@@ -73,7 +74,18 @@ class TestCommands(EthereumTestCaseMixin, TestCase):
         )
         call_command(command, erc20.address, "--no-prompt", stdout=buf)
         self.assertIn("Created token", buf.getvalue())
-        self.assertTrue(Token.objects.get(address=erc20.address).trusted)
+        created_token = Token.objects.get(address=erc20.address)
+        self.assertTrue(created_token.trusted)
+        self.assertTrue(created_token.trusted_admin)
+
+    def test_add_token_trusts_a_token_already_on_a_list(self):
+        # Trusted from a token list, but never curated
+        token = TokenFactory(trusted=True)
+        self.assertFalse(token.trusted_admin)
+
+        call_command("add_token", token.address, stdout=StringIO())
+        token.refresh_from_db()
+        self.assertTrue(token.trusted_admin)
 
     @mock.patch.object(
         Erc20Manager,
@@ -105,3 +117,5 @@ class TestCommands(EthereumTestCaseMixin, TestCase):
 
         call_command(command, "fake-api-key", "--store-db", stdout=buf)
         self.assertTrue(Token.objects.first().trusted)
+        # Bulk ingestion is not curation, the daily task can still untrust them
+        self.assertFalse(Token.objects.first().trusted_admin)
