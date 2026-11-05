@@ -1,8 +1,9 @@
 # SPDX-License-Identifier: FSL-1.1-MIT
 import logging
 import socket
+from collections.abc import Mapping
 from functools import cache
-from typing import Any
+from typing import Any, NamedTuple
 
 from django.conf import settings
 from django.db import transaction
@@ -13,6 +14,8 @@ from kombu import Connection, Exchange, Producer
 from kombu.connection import ConnectionPool
 from kombu.pools import ProducerPool, get_limit
 from kombu.utils.functional import lazy
+
+from safe_transaction_service.utils.request_context import get_event_headers
 
 logger = logging.getLogger(__name__)
 
@@ -25,13 +28,27 @@ EVENTS_APP_ID = "safe-transaction-service"
 CLOSE_TIMEOUT_SECONDS = 5
 
 
+class BufferedEvent(NamedTuple):
+    """
+    Serialized event ready to publish, also kept in the unsent buffer
+    """
+
+    body: bytes
+    routing_key: str
+    headers: Mapping[str, str] | None = None
+
+
 class BaseQueueService:
     """
     Common behavior for the real and the mocked queue services. Subclasses
     only implement ``send_events``, and ``close`` if they hold connections.
     """
 
-    def send_events(self, payloads: list[dict[str, Any]]) -> int:
+    def send_events(
+        self,
+        payloads: list[dict[str, Any]],
+        headers: Mapping[str, str] | None = None,
+    ) -> int:
         raise NotImplementedError
 
     def close(self) -> None:
@@ -58,19 +75,26 @@ class BaseQueueService:
         events are buffered), and ``robust=True`` keeps any unexpected failure
         from preventing sibling ``on_commit`` callbacks.
 
+        The message headers (the ``x-safe-req-id`` of the request being
+        served) are captured when this is called, so buffered events flushed
+        later keep their own.
+
         :param payloads: Event payloads to publish after commit
         """
         if not payloads:
             return
+        headers = get_event_headers()
         if transaction.get_connection().in_atomic_block:
-            transaction.on_commit(lambda: self.send_events(payloads), robust=True)
+            transaction.on_commit(
+                lambda: self.send_events(payloads, headers=headers), robust=True
+            )
         else:
             # Bypass `transaction.on_commit`: with no transaction open it runs
             # the callback immediately anyway, but its autocommit check would
             # force-open a DB connection (`get_autocommit` ->
             # `ensure_connection`) — no need to touch the database just to
             # publish
-            self.send_events(payloads)
+            self.send_events(payloads, headers=headers)
 
 
 class QueueService(BaseQueueService):
@@ -97,7 +121,7 @@ class QueueService(BaseQueueService):
         self.producer_pool: ProducerPool = ProducerPool(
             self.connection_pool, limit=limit
         )
-        self.unsent_events: list[tuple[bytes, str]] = []
+        self.unsent_events: list[BufferedEvent] = []
 
     def _open_connections(self) -> list[Connection]:
         pool = self.connection_pool
@@ -142,22 +166,25 @@ class QueueService(BaseQueueService):
         """
         logger.warning("Broker error, retrying in %ss: %r", interval, exc)
 
-    def _try_publish(self, producer: Producer, event: bytes, routing_key: str) -> bool:
+    def _try_publish(self, producer: Producer, event: BufferedEvent) -> bool:
         """
         Attempt to publish one pre-serialized JSON event with the given
         producer. Returns True on success, never raises.
         """
         try:
             producer.publish(
-                event,
+                event.body,
                 exchange=self.exchange,
                 # Cached per connection by kombu, declared again when `retry`
                 # reconnects, also in the middle of a batch
                 declare=[self.exchange],
-                routing_key=routing_key,
+                routing_key=event.routing_key,
                 content_type="application/json",
                 content_encoding="utf-8",
                 app_id=EVENTS_APP_ID,
+                # Copied, as the mapping is shared by the events of a batch and
+                # kombu can add keys to the dict it is given
+                headers=dict(event.headers) if event.headers else None,
                 retry=True,
                 retry_policy={
                     "max_retries": 1,
@@ -166,25 +193,30 @@ class QueueService(BaseQueueService):
                 },
                 serializer="raw",
             )
-            logger.debug("Event sent with routing_key=%s: %s", routing_key, event)
+            logger.debug(
+                "Event sent with routing_key=%s headers=%s: %s",
+                event.routing_key,
+                event.headers,
+                event.body,
+            )
             return True
         except Exception as exc:
             logger.warning("Failed to publish event: %s", exc)
             return False
 
-    def _publish_events(self, events: list[tuple[bytes, str]]) -> int:
+    def _publish_events(self, events: list[BufferedEvent]) -> int:
         """
         Publish pre-serialized events in order, acquiring a producer from the
         pool only once. Stops on the first failure, never raises.
 
-        :param events: List of ``(serialized_event, routing_key)`` tuples
+        :param events: Events to publish
         :return: Number of events published
         """
         total = 0
         try:
             with self.producer_pool.acquire(block=False) as producer:
-                for event, routing_key in events:
-                    if not self._try_publish(producer, event, routing_key):
+                for event in events:
+                    if not self._try_publish(producer, event):
                         break
                     total += 1
         except Exception as exc:
@@ -194,7 +226,11 @@ class QueueService(BaseQueueService):
             logger.warning("Could not acquire a producer from the pool: %s", exc)
         return total
 
-    def send_events(self, payloads: list[dict[str, Any]]) -> int:
+    def send_events(
+        self,
+        payloads: list[dict[str, Any]],
+        headers: Mapping[str, str] | None = None,
+    ) -> int:
         """
         Serialize and publish several payloads, acquiring a producer from the
         pool only once. Never raises: from the first failed event on, events
@@ -203,10 +239,16 @@ class QueueService(BaseQueueService):
 
         :return: number of events published (payloads + any flushed unsent)
         """
-        events: list[tuple[bytes, str]] = []
+        events: list[BufferedEvent] = []
         for payload in payloads:
             try:
-                events.append((orjson.dumps(payload), self._build_routing_key(payload)))
+                events.append(
+                    BufferedEvent(
+                        orjson.dumps(payload),
+                        self._build_routing_key(payload),
+                        headers,
+                    )
+                )
             except Exception:
                 logger.error("Cannot serialize payload %s", payload, exc_info=True)
         if not events:
@@ -217,7 +259,7 @@ class QueueService(BaseQueueService):
             logger.debug(
                 "Adding %d events to unsent messages, routing keys: %s",
                 len(unsent),
-                [routing_key for _, routing_key in unsent],
+                [event.routing_key for event in unsent],
             )
             self.unsent_events.extend(unsent)
             return total
@@ -275,7 +317,11 @@ class QueueService(BaseQueueService):
 class MockedQueueService(BaseQueueService):
     """Used when EVENTS_QUEUE_URL is not configured."""
 
-    def send_events(self, payloads: list[dict[str, Any]]) -> int:
+    def send_events(
+        self,
+        payloads: list[dict[str, Any]],
+        headers: Mapping[str, str] | None = None,
+    ) -> int:
         logger.debug("MockedQueueService: Not sending %d events", len(payloads))
         return 0
 

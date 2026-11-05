@@ -69,6 +69,10 @@ This repository includes multiple indexers under `safe_transaction_service/histo
 - `SafeTxProcessor.get_execution_result(ethereum_tx, safe_tx_hash)` handles both formats in a single log scan and returns `(failed: bool, payment: int | None)`. Use this instead of separate failed/payment lookups.
 - `safe_tx_execution_events_topics` on `SafeTxProcessor` is the combined set of ExecutionSuccess + ExecutionFailure topics, precomputed in `__init__` for efficient log filtering.
 
+## Events Conventions
+- Events queued while serving an HTTP request carry the edge `x-safe-req-id` as an AMQP message header (`utils/request_context.py`). Only `send_events_on_commit` attaches it; calling `send_events`/`send_event` directly publishes without it.
+- Headers are captured when the event is queued, not when it is published, so buffered events flushed later keep their own id. Preserve this if the unsent buffer changes.
+
 ## Backfill Management Commands
 - Place one-off backfill commands in `safe_transaction_service/history/management/commands/`.
 - Name them `backfill_<thing>.py`.

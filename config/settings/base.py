@@ -136,6 +136,7 @@ INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 # ------------------------------------------------------------------------------
 # https://docs.djangoproject.com/en/dev/ref/settings/#middleware
 MIDDLEWARE = [
+    "safe_transaction_service.middlewares.safe_request_id_middleware.SafeRequestIdMiddleware",
     "safe_transaction_service.middlewares.logging_middleware.LoggingMiddleware",
     "safe_transaction_service.middlewares.proxy_prefix_middleware.ProxyPrefixMiddleware",
     "corsheaders.middleware.CorsMiddleware",

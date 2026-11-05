@@ -501,7 +501,8 @@ class TestSafeTxProcessor(SafeTestCaseMixin, TestCase):
                     "signatureType": SafeSignatureType.APPROVED_HASH.name,
                     "chainId": str(EthereumNetwork.GANACHE.value),
                 }
-            ]
+            ],
+            headers=None,
         )
 
     @mock.patch.object(QueueService, "send_events")
@@ -536,7 +537,8 @@ class TestSafeTxProcessor(SafeTestCaseMixin, TestCase):
                     "blockNumber": ethereum_tx.block_id,
                     "chainId": str(EthereumNetwork.GANACHE.value),
                 }
-            ]
+            ],
+            headers=None,
         )
 
     @mock.patch.object(QueueService, "send_events")
@@ -941,7 +943,8 @@ class TestSafeTxProcessor(SafeTestCaseMixin, TestCase):
                         ),
                         "chainId": str(EthereumNetwork.GANACHE.value),
                     }
-                ]
+                ],
+                headers=None,
             )
 
     def test_process_disable_module_tx(self):

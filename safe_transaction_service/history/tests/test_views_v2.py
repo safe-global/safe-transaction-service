@@ -28,6 +28,7 @@ from safe_eth.util.util import to_0x_hex_str
 from ...contracts.models import ContractQuerySet
 from ...contracts.tests.factories import ContractFactory
 from ...contracts.tx_decoder import DbTxDecoder
+from ...events.services.queue_service import QueueService
 from ...tokens.models import Token
 from ...tokens.tests.factories import TokenFactory
 from ...utils.utils import datetime_to_str
@@ -37,6 +38,7 @@ from ..models import (
     MultisigTransaction,
     SafeContractDelegate,
     SafeLastStatus,
+    TransactionServiceEventType,
 )
 from ..serializers import TransferType
 from ..views_v2 import SafeMultisigTransactionListView
@@ -1353,6 +1355,52 @@ class TestViewsV2V150(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIsNone(response.data["executor"])
         self.assertEqual(len(response.data["confirmations"]), 0)
+
+    @mock.patch.object(QueueService, "send_events")
+    def test_post_multisig_transactions_publishes_safe_req_id(
+        self, send_events_mock: MagicMock
+    ):
+        safe_req_id = "0123456789abcdef0123456789abcdef"
+        safe_owner = Account.create()
+        safe = self.deploy_test_safe(owners=[safe_owner.address])
+        safe_tx = safe.build_multisig_tx(Account.create().address, 1, b"", safe_nonce=0)
+        data = {
+            "to": safe_tx.to,
+            "value": safe_tx.value,
+            "data": None,
+            "operation": safe_tx.operation,
+            "nonce": safe_tx.safe_nonce,
+            "safeTxGas": safe_tx.safe_tx_gas,
+            "baseGas": safe_tx.base_gas,
+            "gasPrice": safe_tx.gas_price,
+            "gasToken": safe_tx.gas_token,
+            "refundReceiver": safe_tx.refund_receiver,
+            "contractTransactionHash": to_0x_hex_str(safe_tx.safe_tx_hash),
+            "sender": safe_owner.address,
+            "signature": to_0x_hex_str(
+                safe_owner.unsafe_sign_hash(safe_tx.safe_tx_hash)["signature"]
+            ),
+        }
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                reverse("v2:history:multisig-transactions", args=(safe.address,)),
+                format="json",
+                data=data,
+                headers={"x-safe-req-id": safe_req_id},
+            )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        published_types = set()
+        for call in send_events_mock.call_args_list:
+            self.assertEqual(call.kwargs["headers"], {"x-safe-req-id": safe_req_id})
+            published_types.update(payload["type"] for payload in call.args[0])
+        self.assertEqual(
+            published_types,
+            {
+                TransactionServiceEventType.PENDING_MULTISIG_TRANSACTION.name,
+                TransactionServiceEventType.NEW_CONFIRMATION.name,
+            },
+        )
 
     def test_post_multisig_transactions(self):
         safe_owner_1 = Account.create()

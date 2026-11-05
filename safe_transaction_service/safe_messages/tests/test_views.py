@@ -21,8 +21,12 @@ from safe_eth.safe.signatures import signature_to_bytes
 from safe_eth.safe.tests.safe_test_case import SafeTestCaseMixin
 from safe_eth.util.util import to_0x_hex_str
 
+from safe_transaction_service.events.services.queue_service import QueueService
 from safe_transaction_service.history.helpers import DelegateSignatureHelperV2
-from safe_transaction_service.history.models import SafeContractDelegate
+from safe_transaction_service.history.models import (
+    SafeContractDelegate,
+    TransactionServiceEventType,
+)
 from safe_transaction_service.history.tests.factories import SafeContractFactory
 from safe_transaction_service.safe_messages.models import (
     SafeMessage,
@@ -146,6 +150,49 @@ class TestMessageViews(SafeTestCaseMixin, APITestCase):
                         "signatureType": "EOA",
                     }
                 ],
+            },
+        )
+
+    @mock.patch.object(QueueService, "send_events")
+    @mock.patch(
+        "safe_transaction_service.safe_messages.serializers.get_safe_owners",
+    )
+    def test_safe_messages_create_view_publishes_safe_req_id(
+        self, get_owners_mock: MagicMock, send_events_mock: MagicMock
+    ):
+        safe_req_id = "0123456789abcdef0123456789abcdef"
+        account = Account.create()
+        get_owners_mock.return_value = [account.address]
+        safe = self.deploy_test_safe()
+        message = "Text to sign message"
+        safe_message_hash = safe.get_message_hash(
+            fast_keccak(encode_eip191_message(message))
+        )
+        data = {
+            "message": message,
+            "description": "Testing request id",
+            "signature": to_0x_hex_str(
+                account.unsafe_sign_hash(safe_message_hash)["signature"]
+            ),
+        }
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                reverse("v1:safe_messages:safe-messages", args=(safe.address,)),
+                format="json",
+                data=data,
+                headers={"x-safe-req-id": safe_req_id},
+            )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        published_types = set()
+        for call in send_events_mock.call_args_list:
+            self.assertEqual(call.kwargs["headers"], {"x-safe-req-id": safe_req_id})
+            published_types.update(payload["type"] for payload in call.args[0])
+        self.assertEqual(
+            published_types,
+            {
+                TransactionServiceEventType.MESSAGE_CREATED.name,
+                TransactionServiceEventType.MESSAGE_CONFIRMATION.name,
             },
         )
 
