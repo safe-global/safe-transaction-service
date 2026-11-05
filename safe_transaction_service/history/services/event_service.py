@@ -588,9 +588,9 @@ def build_safe_config_payloads(
             "type": TransactionServiceEventType.SAFE_CONFIG_UPDATED.name,
             "txHash": tx_hash,
             "change": change,
-            "data": data,
+            "data": change_data,
             "status": status,
             "chainId": chain_id,
         }
-        for change, data in changes
+        for change, change_data in changes
     ]
