@@ -24,7 +24,7 @@ class TestBuildSafeConfigPayloads(TestCase):
     def setUp(self):
         self.safe_address = Account.create().address
         self.internal_tx = InternalTxFactory(_from=self.safe_address)
-        self.before = SafeConfigSnapshot(
+        self.previous_config = SafeConfigSnapshot(
             owners=[Account.create().address, Account.create().address],
             threshold=1,
             nonce=5,
@@ -37,14 +37,16 @@ class TestBuildSafeConfigPayloads(TestCase):
 
     def build_payloads(self, **changes) -> list[dict]:
         """
-        :param changes: Fields of ``self.before`` changed by the decoded tx
+        :param changes: Fields of ``self.previous_config`` changed by the decoded tx
         :return: Payloads for the changes
         """
-        after = dataclasses.replace(self.before, **changes)
+        new_config = dataclasses.replace(self.previous_config, **changes)
         safe_status = SafeLastStatusFactory.build(
-            address=self.safe_address, **dataclasses.asdict(after)
+            address=self.safe_address, **dataclasses.asdict(new_config)
         )
-        return build_safe_config_payloads(self.before, self.internal_tx, safe_status)
+        return build_safe_config_payloads(
+            self.previous_config, self.internal_tx, safe_status
+        )
 
     def assert_changes(self, payloads: list[dict], expected: list[tuple[str, dict]]):
         self.assertEqual(
@@ -61,7 +63,7 @@ class TestBuildSafeConfigPayloads(TestCase):
         """
         A nonce change alone builds no payloads.
         """
-        self.assertEqual(self.build_payloads(nonce=self.before.nonce + 1), [])
+        self.assertEqual(self.build_payloads(nonce=self.previous_config.nonce + 1), [])
 
     def test_payload(self):
         """
@@ -69,7 +71,7 @@ class TestBuildSafeConfigPayloads(TestCase):
         """
         new_owner = Account.create().address
         self.assertEqual(
-            self.build_payloads(owners=[new_owner] + self.before.owners),
+            self.build_payloads(owners=[new_owner] + self.previous_config.owners),
             [
                 {
                     "timestamp": int(self.internal_tx.timestamp.timestamp()),
@@ -79,14 +81,14 @@ class TestBuildSafeConfigPayloads(TestCase):
                     "change": "ADDED_OWNER",
                     "data": {"owner": new_owner},
                     "status": {
-                        "owners": [new_owner] + self.before.owners,
-                        "threshold": self.before.threshold,
-                        "nonce": self.before.nonce,
-                        "enabledModules": self.before.enabled_modules,
+                        "owners": [new_owner] + self.previous_config.owners,
+                        "threshold": self.previous_config.threshold,
+                        "nonce": self.previous_config.nonce,
+                        "enabledModules": self.previous_config.enabled_modules,
                         "guard": NULL_ADDRESS,
                         "moduleGuard": NULL_ADDRESS,
                         "fallbackHandler": NULL_ADDRESS,
-                        "masterCopy": self.before.master_copy,
+                        "masterCopy": self.previous_config.master_copy,
                     },
                     "chainId": str(EthereumNetwork.GANACHE.value),
                 }
@@ -97,10 +99,10 @@ class TestBuildSafeConfigPayloads(TestCase):
         """
         A swapped owner builds ``REMOVED_OWNER`` and then ``ADDED_OWNER``.
         """
-        old_owner = self.before.owners[0]
+        old_owner = self.previous_config.owners[0]
         new_owner = Account.create().address
         self.assert_changes(
-            self.build_payloads(owners=[new_owner, self.before.owners[1]]),
+            self.build_payloads(owners=[new_owner, self.previous_config.owners[1]]),
             [
                 ("REMOVED_OWNER", {"owner": old_owner}),
                 ("ADDED_OWNER", {"owner": new_owner}),
@@ -113,7 +115,7 @@ class TestBuildSafeConfigPayloads(TestCase):
         """
         new_owner = Account.create().address
         payloads = self.build_payloads(
-            owners=[new_owner] + self.before.owners, threshold=2
+            owners=[new_owner] + self.previous_config.owners, threshold=2
         )
         self.assert_changes(
             payloads,
@@ -137,7 +139,7 @@ class TestBuildSafeConfigPayloads(TestCase):
         master_copy = Account.create().address
         self.assert_changes(
             self.build_payloads(
-                owners=self.before.owners[1:],
+                owners=self.previous_config.owners[1:],
                 threshold=2,
                 enabled_modules=[new_module],
                 guard=guard,
@@ -146,9 +148,12 @@ class TestBuildSafeConfigPayloads(TestCase):
                 master_copy=master_copy,
             ),
             [
-                ("REMOVED_OWNER", {"owner": self.before.owners[0]}),
+                ("REMOVED_OWNER", {"owner": self.previous_config.owners[0]}),
                 ("CHANGED_THRESHOLD", {"threshold": 2}),
-                ("DISABLED_MODULE", {"module": self.before.enabled_modules[0]}),
+                (
+                    "DISABLED_MODULE",
+                    {"module": self.previous_config.enabled_modules[0]},
+                ),
                 ("ENABLED_MODULE", {"module": new_module}),
                 ("CHANGED_GUARD", {"guard": guard}),
                 ("CHANGED_MODULE_GUARD", {"moduleGuard": module_guard}),
@@ -161,8 +166,8 @@ class TestBuildSafeConfigPayloads(TestCase):
         """
         Unset guards are sent as ``NULL_ADDRESS``.
         """
-        self.before = dataclasses.replace(
-            self.before,
+        self.previous_config = dataclasses.replace(
+            self.previous_config,
             guard=Account.create().address,
             module_guard=Account.create().address,
         )

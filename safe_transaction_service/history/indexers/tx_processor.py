@@ -570,7 +570,7 @@ class SafeTxProcessor(TxProcessor):
         master_copy = internal_tx.to
         processed_successfully = True
         safe_relevant_txs: list[SafeRelevantTransaction] = []
-        config_before = None
+        previous_config = None
 
         if function_name == "setup" and contract_address != NULL_ADDRESS:
             # Index new Safes
@@ -604,7 +604,7 @@ class SafeTxProcessor(TxProcessor):
             )
         else:
             safe_last_status = self.get_last_safe_status_for_address(contract_address)
-            config_before = take_safe_config_snapshot(
+            previous_config = take_safe_config_snapshot(
                 function_name, internal_tx, safe_last_status
             )
             if not safe_last_status:
@@ -934,8 +934,10 @@ class SafeTxProcessor(TxProcessor):
             processed=processed_successfully,
             safe_relevant_transactions=safe_relevant_txs,
             event_payloads=(
-                build_safe_config_payloads(config_before, internal_tx, safe_last_status)
-                if config_before is not None
+                build_safe_config_payloads(
+                    previous_config, internal_tx, safe_last_status
+                )
+                if previous_config is not None
                 else []
             ),
         )

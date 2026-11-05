@@ -519,7 +519,7 @@ def take_safe_config_snapshot(
 
 
 def build_safe_config_payloads(
-    before: SafeConfigSnapshot,
+    previous_config: SafeConfigSnapshot,
     internal_tx: InternalTx,
     safe_status: SafeLastStatus,
 ) -> list[dict[str, Any]]:
@@ -529,52 +529,57 @@ def build_safe_config_payloads(
     owner plus an added owner, and the threshold is only reported when its value
     changes.
 
-    :param before: Snapshot returned by ``take_safe_config_snapshot``
+    :param previous_config: Snapshot returned by ``take_safe_config_snapshot``
     :param internal_tx: Processed internal tx
     :param safe_status: Safe status after processing the decoded tx
     :return: Payloads, empty if nothing changed
     """
-    after = SafeConfigSnapshot.from_safe_status(safe_status)
+    new_config = SafeConfigSnapshot.from_safe_status(safe_status)
     changes: list[tuple[str, dict[str, Any]]] = []
     changes.extend(
         ("REMOVED_OWNER", {"owner": owner})
-        for owner in before.owners
-        if owner not in after.owners
+        for owner in previous_config.owners
+        if owner not in new_config.owners
     )
     changes.extend(
         ("ADDED_OWNER", {"owner": owner})
-        for owner in after.owners
-        if owner not in before.owners
+        for owner in new_config.owners
+        if owner not in previous_config.owners
     )
-    if before.threshold != after.threshold:
-        changes.append(("CHANGED_THRESHOLD", {"threshold": after.threshold}))
+    if previous_config.threshold != new_config.threshold:
+        changes.append(("CHANGED_THRESHOLD", {"threshold": new_config.threshold}))
     changes.extend(
         ("DISABLED_MODULE", {"module": module})
-        for module in before.enabled_modules
-        if module not in after.enabled_modules
+        for module in previous_config.enabled_modules
+        if module not in new_config.enabled_modules
     )
     changes.extend(
         ("ENABLED_MODULE", {"module": module})
-        for module in after.enabled_modules
-        if module not in before.enabled_modules
+        for module in new_config.enabled_modules
+        if module not in previous_config.enabled_modules
     )
-    if before.guard != after.guard:
-        changes.append(("CHANGED_GUARD", {"guard": after.guard}))
-    if before.module_guard != after.module_guard:
-        changes.append(("CHANGED_MODULE_GUARD", {"moduleGuard": after.module_guard}))
-    if before.fallback_handler != after.fallback_handler:
+    if previous_config.guard != new_config.guard:
+        changes.append(("CHANGED_GUARD", {"guard": new_config.guard}))
+    if previous_config.module_guard != new_config.module_guard:
         changes.append(
-            ("CHANGED_FALLBACK_HANDLER", {"fallbackHandler": after.fallback_handler})
+            ("CHANGED_MODULE_GUARD", {"moduleGuard": new_config.module_guard})
         )
-    if before.master_copy != after.master_copy:
-        changes.append(("CHANGED_MASTER_COPY", {"masterCopy": after.master_copy}))
+    if previous_config.fallback_handler != new_config.fallback_handler:
+        changes.append(
+            (
+                "CHANGED_FALLBACK_HANDLER",
+                {"fallbackHandler": new_config.fallback_handler},
+            )
+        )
+    if previous_config.master_copy != new_config.master_copy:
+        changes.append(("CHANGED_MASTER_COPY", {"masterCopy": new_config.master_copy}))
 
     if not changes:
         return []
 
     timestamp = int(internal_tx.timestamp.timestamp())
     tx_hash = to_0x_hex_str(HexBytes(internal_tx.ethereum_tx_id))
-    status = after.to_payload()
+    status = new_config.to_payload()
     chain_id = str(get_chain_id())
     return [
         {
