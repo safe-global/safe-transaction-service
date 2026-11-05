@@ -55,7 +55,8 @@ This repository includes multiple indexers under `safe_transaction_service/histo
 
 ## Testing
 - Virtualenv is managed by uv at `.venv`. Activate with `source .venv/bin/activate` or prefix commands with `uv run`.
-- Dependencies must be up before running tests: `docker compose --profile develop up db redis ganache rabbitmq -d`
+- Dependencies must be up before running tests: `docker compose --profile develop up -d --wait db redis anvil rabbitmq`
+- The test node is anvil (chain id 1337, same mnemonic as `ganache -d`, so test keys and addresses are the ganache ones). anvil returns the tx hash before the block is mined: after a send whose state the test reads next, call `self.wait_for_receipt(tx_hash)`.
 - Use `pytest` (no parameters). It should auto-detect configuration. `DJANGO_SETTINGS_MODULE=config.settings.test uv run python -m pytest`
 - Use factories (e.g. `SafeContractFactory`) instead of inline helpers or `get_or_create` calls in tests.
 

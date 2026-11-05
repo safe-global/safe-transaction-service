@@ -152,7 +152,7 @@ class TestViewsV150(SafeTestCaseMixin, APITestCase):
                 url = reverse(url_name)
                 response = self.client.get(url, format="json")
                 self.assertEqual(response.status_code, status.HTTP_200_OK)
-                self.assertIn("EthereumJS TestRPC", response.data["version"])
+                self.assertIn("anvil", response.data["version"])
                 self.assertGreaterEqual(response.data["block_number"], 0)
                 self.assertEqual(response.data["chain_id"], 1337)
                 self.assertEqual(response.data["chain"], "GANACHE")

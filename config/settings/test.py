@@ -38,7 +38,7 @@ PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
 # CELERY
 CELERY_TASK_ALWAYS_EAGER = True
 
-# Ganache #2 private key
+# Account #2 of the test node mnemonic
 ETHEREUM_TEST_PRIVATE_KEY = (
     "6370fd033278c143179d81c5526140625662b8daa446c22ee2d73db3707e620c"
 )
