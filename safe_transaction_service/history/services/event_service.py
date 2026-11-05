@@ -4,7 +4,7 @@ Build event payloads for the queue and publish them
 """
 
 import dataclasses
-from datetime import timedelta
+from datetime import datetime, timedelta
 from logging import getLogger
 from typing import Any, Literal, TypedDict
 
@@ -44,8 +44,16 @@ logger = getLogger(__name__)
 
 # Events are only sent for data at most this old, so reindexing does not send
 # them again
-EVENT_MAX_AGE_MINUTES = 60
-EVENT_MAX_AGE = timedelta(minutes=EVENT_MAX_AGE_MINUTES)
+EVENT_MAX_AGE = timedelta(minutes=60)
+
+
+def is_too_old_for_event(when: datetime) -> bool:
+    """
+    :param when: Moment the data of the event was created, modified or mined
+    :return: ``True`` if the data is older than ``EVENT_MAX_AGE``
+    """
+    return when + EVENT_MAX_AGE < timezone.now()
+
 
 # Transient (non-DB) attributes set by the indexers on transfer / ether ``InternalTx``
 # instances, telling whether the `to` / `_from` side is a tracked Safe. Used by
@@ -324,31 +332,26 @@ def is_relevant_event(
     sender: type[Model],
     instance: TokenTransfer | InternalTx | MultisigConfirmation | MultisigTransaction,
     created: bool,
-    minutes: int = EVENT_MAX_AGE_MINUTES,
 ) -> bool:
     """
-    For `MultisigTransaction`, event is valid if the instance was modified in the last `minutes` minutes.
-    For the other instances, event is valid if the instance was created in the last `minutes` minutes.
+    For `MultisigTransaction`, event is valid if the instance was modified in the last `EVENT_MAX_AGE`.
+    For the other instances, event is valid if the instance was created in the last `EVENT_MAX_AGE`.
     This time restriction is important to prevent sending duplicate transactions when reindexing.
 
     :param sender:
     :param instance:
     :param created:
-    :param minutes: Minutes to allow an old event
     :return: `True` if event is valid, `False` otherwise
     """
     if (
         sender == MultisigTransaction
     ):  # Different logic, as `MultisigTransaction` can change from Pending to Executed
         # Don't send events for `not trusted` transactions
-        if (
-            not instance.trusted
-            or instance.modified + timedelta(minutes=minutes) < timezone.now()
-        ):
+        if not instance.trusted or is_too_old_for_event(instance.modified):
             return False
     elif not created:
         return False
-    elif instance.created + timedelta(minutes=minutes) < timezone.now():
+    elif is_too_old_for_event(instance.created):
         return False
     return True
 
@@ -509,7 +512,7 @@ def take_safe_config_snapshot(
         function_name not in SAFE_CONFIG_FUNCTIONS
         or safe_status is None
         or settings.DISABLE_SERVICE_EVENTS
-        or internal_tx.timestamp + EVENT_MAX_AGE < timezone.now()
+        or is_too_old_for_event(internal_tx.timestamp)
     ):
         return None
     return SafeConfigSnapshot.from_safe_status(safe_status)
