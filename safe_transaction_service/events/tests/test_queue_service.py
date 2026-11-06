@@ -10,11 +10,7 @@ from kombu import Connection, Exchange, Queue
 from kombu.exceptions import LimitExceeded
 from kombu.pools import get_limit
 
-from ...utils.request_context import (
-    SAFE_REQ_ID_HEADER,
-    reset_safe_req_id,
-    set_safe_req_id,
-)
+from ...utils.request_context import SAFE_REQ_ID_HEADER, safe_req_id_context
 from ..services import queue_service as queue_service_module
 from ..services.queue_service import (
     EVENTS_APP_ID,
@@ -56,9 +52,6 @@ class TestQueueService(TestCase):
         if msg := self._get_raw_message():
             return json.loads(msg.body)
         return None
-
-    def _set_safe_req_id(self, value: str | None) -> None:
-        self.addCleanup(reset_safe_req_id, set_safe_req_id(value))
 
     def test_send_event_to_queue(self):
         payload = {"event": "test_event", "type": "event type"}
@@ -196,7 +189,7 @@ class TestQueueService(TestCase):
 
     def test_send_events_sets_safe_req_id(self):
         queue_service = QueueService()
-        self._set_safe_req_id(SAFE_REQ_ID)
+        self.enterContext(safe_req_id_context(SAFE_REQ_ID))
         payloads = [{"message": f"event {i}"} for i in range(2)]
         self.assertEqual(queue_service.send_events(payloads), 2)
         for payload in payloads:
@@ -207,7 +200,7 @@ class TestQueueService(TestCase):
 
     def test_send_event_sets_safe_req_id(self):
         queue_service = QueueService()
-        self._set_safe_req_id(SAFE_REQ_ID)
+        self.enterContext(safe_req_id_context(SAFE_REQ_ID))
         queue_service.send_event({"message": "single"})
         self.assertEqual(
             self._get_raw_message().headers, {SAFE_REQ_ID_HEADER: SAFE_REQ_ID}
@@ -222,17 +215,16 @@ class TestQueueService(TestCase):
     def test_buffered_event_keeps_its_safe_req_id(self):
         queue_service = QueueService()
         queue_service.clear_unsent_events()
-        token = set_safe_req_id(SAFE_REQ_ID)
-        try:
-            with mock.patch.object(QueueService, "_try_publish", return_value=False):
-                queue_service.send_events([{"message": "buffered"}])
-        finally:
-            reset_safe_req_id(token)
+        with (
+            safe_req_id_context(SAFE_REQ_ID),
+            mock.patch.object(QueueService, "_try_publish", return_value=False),
+        ):
+            queue_service.send_events([{"message": "buffered"}])
         self.assertEqual(len(queue_service.unsent_events), 1)
 
         # Flushed while serving another request
-        self._set_safe_req_id(OTHER_SAFE_REQ_ID)
-        queue_service.send_events([{"message": "recovered"}])
+        with safe_req_id_context(OTHER_SAFE_REQ_ID):
+            queue_service.send_events([{"message": "recovered"}])
         recovered = self._get_raw_message()
         self.assertEqual(json.loads(recovered.body), {"message": "recovered"})
         self.assertEqual(recovered.headers[SAFE_REQ_ID_HEADER], OTHER_SAFE_REQ_ID)

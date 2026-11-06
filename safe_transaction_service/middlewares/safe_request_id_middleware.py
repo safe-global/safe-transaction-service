@@ -3,8 +3,7 @@ from django.http import HttpRequest
 
 from safe_transaction_service.utils.request_context import (
     SAFE_REQ_ID_HEADER,
-    reset_safe_req_id,
-    set_safe_req_id,
+    safe_req_id_context,
 )
 
 
@@ -18,8 +17,5 @@ class SafeRequestIdMiddleware:
         self.get_response = get_response
 
     def __call__(self, request: HttpRequest):
-        token = set_safe_req_id(request.headers.get(SAFE_REQ_ID_HEADER))
-        try:
+        with safe_req_id_context(request.headers.get(SAFE_REQ_ID_HEADER)):
             return self.get_response(request)
-        finally:
-            reset_safe_req_id(token)

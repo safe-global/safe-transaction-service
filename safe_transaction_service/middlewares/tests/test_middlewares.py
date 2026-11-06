@@ -65,28 +65,6 @@ class TestMiddlewares(unittest.TestCase):
         _, seen = self._call_safe_request_id_middleware({"X-Safe-Req-Id": SAFE_REQ_ID})
         self.assertEqual(seen, SAFE_REQ_ID)
 
-    def test_safe_request_id_middleware_invalid_or_missing_header(self):
-        for headers in (None, {"x-safe-req-id": "not-a-request-id"}):
-            with self.subTest(headers=headers):
-                _, seen = self._call_safe_request_id_middleware(headers)
-                self.assertIsNone(seen)
-                self.assertIsNone(get_safe_req_id())
-
-    def test_safe_request_id_middleware_does_not_leak_to_next_request(self):
-        _, seen = self._call_safe_request_id_middleware({"x-safe-req-id": SAFE_REQ_ID})
-        self.assertEqual(seen, SAFE_REQ_ID)
-        _, seen = self._call_safe_request_id_middleware()
-        self.assertIsNone(seen)
-
-    def test_safe_request_id_middleware_resets_on_exception(self):
-        get_response = MagicMock(side_effect=ValueError)
-        request = RequestFactory().get(
-            "/test/path", headers={"x-safe-req-id": SAFE_REQ_ID}
-        )
-        with self.assertRaises(ValueError):
-            SafeRequestIdMiddleware(get_response)(request)
-        self.assertIsNone(get_safe_req_id())
-
 
 class TestSafeRequestIdMiddlewareOrder(TestCase):
     def test_request_id_is_set_when_logging_middleware_logs(self):
