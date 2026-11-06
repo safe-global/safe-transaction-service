@@ -26,6 +26,8 @@ def cached_schema_view(view):
     )
 
 
+schema_json_view = cached_schema_view(SpectacularAPIView.as_view())
+
 swagger_urlpatterns = [
     path(
         "",
@@ -34,8 +36,15 @@ swagger_urlpatterns = [
     ),
     re_path(
         r"^schema\/(?:\?format=(?P<format>json|yaml))?$",
-        cached_schema_view(SpectacularAPIView().as_view()),
+        schema_json_view,
         name="schema-json",
+    ),
+    # Conventional alias of the schema, so agents find it without knowing `schema/`
+    path(
+        "openapi.json",
+        schema_json_view,
+        {"format": "json"},
+        name="schema-openapi-json",
     ),
     path(
         "redoc/",
