@@ -30,7 +30,7 @@ EVENTS_APP_ID = "safe-transaction-service"
 CLOSE_TIMEOUT_SECONDS = 5
 
 
-class BufferedEvent(NamedTuple):
+class SerializedEvent(NamedTuple):
     """
     Serialized event ready to publish, also kept in the unsent buffer
     """
@@ -112,7 +112,7 @@ class QueueService(BaseQueueService):
         self.producer_pool: ProducerPool = ProducerPool(
             self.connection_pool, limit=limit
         )
-        self.unsent_events: list[BufferedEvent] = []
+        self.unsent_events: list[SerializedEvent] = []
 
     def _open_connections(self) -> list[Connection]:
         pool = self.connection_pool
@@ -157,7 +157,7 @@ class QueueService(BaseQueueService):
         """
         logger.warning("Broker error, retrying in %ss: %r", interval, exc)
 
-    def _try_publish(self, producer: Producer, event: BufferedEvent) -> bool:
+    def _try_publish(self, producer: Producer, event: SerializedEvent) -> bool:
         """
         Attempt to publish one pre-serialized JSON event with the given
         producer. Returns True on success, never raises.
@@ -197,7 +197,7 @@ class QueueService(BaseQueueService):
             logger.warning("Failed to publish event: %s", exc)
             return False
 
-    def _publish_events(self, events: list[BufferedEvent]) -> int:
+    def _publish_events(self, events: list[SerializedEvent]) -> int:
         """
         Publish pre-serialized events in order, acquiring a producer from the
         pool only once. Stops on the first failure, never raises.
@@ -232,11 +232,11 @@ class QueueService(BaseQueueService):
         :return: number of events published (payloads + any flushed unsent)
         """
         safe_req_id = get_safe_req_id()
-        events: list[BufferedEvent] = []
+        events: list[SerializedEvent] = []
         for payload in payloads:
             try:
                 events.append(
-                    BufferedEvent(
+                    SerializedEvent(
                         orjson.dumps(payload),
                         self._build_routing_key(payload),
                         safe_req_id,
