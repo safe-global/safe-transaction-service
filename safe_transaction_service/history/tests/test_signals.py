@@ -419,9 +419,7 @@ class TestSignals(SafeTestCaseMixin, TestCase):
             "executor": multisig_tx.ethereum_tx._from,
             "chainId": str(EthereumNetwork.GANACHE.value),
         }
-        send_events_mock.assert_called_with(
-            [pending_multisig_transaction_payload], headers=None
-        )
+        send_events_mock.assert_called_with([pending_multisig_transaction_payload])
 
         # Deleting a tx should fire an event timestamped at the deletion time.
         # The payload must be built before commit, while the row still exists
@@ -439,9 +437,7 @@ class TestSignals(SafeTestCaseMixin, TestCase):
             "safeTxHash": safe_tx_hash,
             "chainId": str(EthereumNetwork.GANACHE.value),
         }
-        send_events_mock.assert_called_with(
-            [deleted_multisig_transaction_payload], headers=None
-        )
+        send_events_mock.assert_called_with([deleted_multisig_transaction_payload])
 
     @factory.django.mute_signals(post_save)
     @mock.patch("safe_transaction_service.history.signals.get_queue_service")
@@ -681,7 +677,7 @@ class TestSignals(SafeTestCaseMixin, TestCase):
             "expiryDateSeconds": int(delegate_for_safe.expiry_date.timestamp()),
             "chainId": str(EthereumNetwork.GANACHE.value),
         }
-        send_events_mock.assert_called_with([new_delegate_user_payload], headers=None)
+        send_events_mock.assert_called_with([new_delegate_user_payload])
 
         with self.captureOnCommitCallbacks(execute=True):
             permanent_delegate_without_safe = SafeContractDelegateFactory(
@@ -696,7 +692,7 @@ class TestSignals(SafeTestCaseMixin, TestCase):
             "expiryDateSeconds": None,
             "chainId": str(EthereumNetwork.GANACHE.value),
         }
-        send_events_mock.assert_called_with([new_delegate_user_payload], headers=None)
+        send_events_mock.assert_called_with([new_delegate_user_payload])
 
         # Updated delegate should fire an event
         with self.captureOnCommitCallbacks(execute=True):
@@ -718,9 +714,7 @@ class TestSignals(SafeTestCaseMixin, TestCase):
             "expiryDateSeconds": int(new_expiry_date.timestamp()),
             "chainId": str(EthereumNetwork.GANACHE.value),
         }
-        send_events_mock.assert_called_with(
-            [updated_delegate_user_payload], headers=None
-        )
+        send_events_mock.assert_called_with([updated_delegate_user_payload])
 
         # Deleted delegate should fire an event
         with self.captureOnCommitCallbacks(execute=True):
@@ -736,9 +730,7 @@ class TestSignals(SafeTestCaseMixin, TestCase):
             "expiryDateSeconds": int(delegate_to_delete.expiry_date.timestamp()),
             "chainId": str(EthereumNetwork.GANACHE.value),
         }
-        send_events_mock.assert_called_with(
-            [deleted_delegate_user_payload], headers=None
-        )
+        send_events_mock.assert_called_with([deleted_delegate_user_payload])
 
     @factory.django.mute_signals(post_save)
     @mock.patch("safe_transaction_service.history.cache.remove_cache_views")

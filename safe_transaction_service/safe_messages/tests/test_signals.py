@@ -41,7 +41,7 @@ class TestSafeMessageSignals(SafeTestCaseMixin, TestCase):
             "chainId": str(EthereumNetwork.GANACHE.value),
         }
 
-        send_events_mock.assert_called_with([message_created_payload], headers=None)
+        send_events_mock.assert_called_with([message_created_payload])
 
         safe_message_confirmation = SafeMessageConfirmationFactory(
             safe_message=safe_message
@@ -55,9 +55,7 @@ class TestSafeMessageSignals(SafeTestCaseMixin, TestCase):
             "messageHash": safe_message.message_hash,
             "chainId": str(EthereumNetwork.GANACHE.value),
         }
-        send_events_mock.assert_called_with(
-            [message_confirmation_payload], headers=None
-        )
+        send_events_mock.assert_called_with([message_confirmation_payload])
 
     @mock.patch.object(QueueService, "send_events")
     def test_signals_are_correctly_fired(self, send_events_mock: MagicMock):
@@ -73,7 +71,7 @@ class TestSafeMessageSignals(SafeTestCaseMixin, TestCase):
             "chainId": str(EthereumNetwork.GANACHE.value),
         }
 
-        send_events_mock.assert_called_with([message_created_payload], headers=None)
+        send_events_mock.assert_called_with([message_created_payload])
 
         # Creating a confirmation should fire a signal and an event should be sent
         with self.captureOnCommitCallbacks(execute=True):
@@ -87,6 +85,4 @@ class TestSafeMessageSignals(SafeTestCaseMixin, TestCase):
             "messageHash": safe_message.message_hash,
             "chainId": str(EthereumNetwork.GANACHE.value),
         }
-        send_events_mock.assert_called_with(
-            [message_confirmation_payload], headers=None
-        )
+        send_events_mock.assert_called_with([message_confirmation_payload])

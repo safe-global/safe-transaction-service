@@ -1356,10 +1356,7 @@ class TestViewsV2V150(SafeTestCaseMixin, APITestCase):
         self.assertIsNone(response.data["executor"])
         self.assertEqual(len(response.data["confirmations"]), 0)
 
-    @mock.patch.object(QueueService, "send_events")
-    def test_post_multisig_transactions_publishes_safe_req_id(
-        self, send_events_mock: MagicMock
-    ):
+    def test_post_multisig_transactions_publishes_safe_req_id(self):
         safe_req_id = "0123456789abcdef0123456789abcdef"
         safe_owner = Account.create()
         safe = self.deploy_test_safe(owners=[safe_owner.address])
@@ -1381,7 +1378,26 @@ class TestViewsV2V150(SafeTestCaseMixin, APITestCase):
                 safe_owner.unsafe_sign_hash(safe_tx.safe_tx_hash)["signature"]
             ),
         }
-        with self.captureOnCommitCallbacks(execute=True):
+        published = []
+        # Django's TestCase only runs `on_commit` callbacks once the request has
+        # returned. In production the commit happens while the request is still
+        # served, so publish right away, as it does with no transaction open
+        with (
+            mock.patch.object(
+                QueueService,
+                "send_events_on_commit",
+                autospec=True,
+                side_effect=lambda queue_service, payloads: queue_service.send_events(
+                    payloads
+                ),
+            ),
+            mock.patch.object(
+                QueueService,
+                "_publish_events",
+                autospec=True,
+                side_effect=lambda _, events: published.extend(events) or len(events),
+            ),
+        ):
             response = self.client.post(
                 reverse("v2:history:multisig-transactions", args=(safe.address,)),
                 format="json",
@@ -1390,12 +1406,10 @@ class TestViewsV2V150(SafeTestCaseMixin, APITestCase):
             )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
-        published_types = set()
-        for call in send_events_mock.call_args_list:
-            self.assertEqual(call.kwargs["headers"], {"x-safe-req-id": safe_req_id})
-            published_types.update(payload["type"] for payload in call.args[0])
+        for event in published:
+            self.assertEqual(event.safe_req_id, safe_req_id)
         self.assertEqual(
-            published_types,
+            {json.loads(event.body)["type"] for event in published},
             {
                 TransactionServiceEventType.PENDING_MULTISIG_TRANSACTION.name,
                 TransactionServiceEventType.NEW_CONFIRMATION.name,

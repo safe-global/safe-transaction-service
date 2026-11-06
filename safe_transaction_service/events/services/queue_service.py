@@ -1,7 +1,6 @@
 # SPDX-License-Identifier: FSL-1.1-MIT
 import logging
 import socket
-from collections.abc import Mapping
 from functools import cache
 from typing import Any, NamedTuple
 
@@ -15,7 +14,10 @@ from kombu.connection import ConnectionPool
 from kombu.pools import ProducerPool, get_limit
 from kombu.utils.functional import lazy
 
-from safe_transaction_service.utils.request_context import get_event_headers
+from safe_transaction_service.utils.request_context import (
+    SAFE_REQ_ID_HEADER,
+    get_safe_req_id,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +37,7 @@ class BufferedEvent(NamedTuple):
 
     body: bytes
     routing_key: str
-    headers: Mapping[str, str] | None = None
+    safe_req_id: str | None
 
 
 class BaseQueueService:
@@ -44,11 +46,7 @@ class BaseQueueService:
     only implement ``send_events``, and ``close`` if they hold connections.
     """
 
-    def send_events(
-        self,
-        payloads: list[dict[str, Any]],
-        headers: Mapping[str, str] | None = None,
-    ) -> int:
+    def send_events(self, payloads: list[dict[str, Any]]) -> int:
         raise NotImplementedError
 
     def close(self) -> None:
@@ -75,26 +73,19 @@ class BaseQueueService:
         events are buffered), and ``robust=True`` keeps any unexpected failure
         from preventing sibling ``on_commit`` callbacks.
 
-        The message headers (the ``x-safe-req-id`` of the request being
-        served) are captured when this is called, so buffered events flushed
-        later keep their own.
-
         :param payloads: Event payloads to publish after commit
         """
         if not payloads:
             return
-        headers = get_event_headers()
         if transaction.get_connection().in_atomic_block:
-            transaction.on_commit(
-                lambda: self.send_events(payloads, headers=headers), robust=True
-            )
+            transaction.on_commit(lambda: self.send_events(payloads), robust=True)
         else:
             # Bypass `transaction.on_commit`: with no transaction open it runs
             # the callback immediately anyway, but its autocommit check would
             # force-open a DB connection (`get_autocommit` ->
             # `ensure_connection`) — no need to touch the database just to
             # publish
-            self.send_events(payloads, headers=headers)
+            self.send_events(payloads)
 
 
 class QueueService(BaseQueueService):
@@ -182,9 +173,11 @@ class QueueService(BaseQueueService):
                 content_type="application/json",
                 content_encoding="utf-8",
                 app_id=EVENTS_APP_ID,
-                # Copied, as the mapping is shared by the events of a batch and
-                # kombu can add keys to the dict it is given
-                headers=dict(event.headers) if event.headers else None,
+                headers=(
+                    {SAFE_REQ_ID_HEADER: event.safe_req_id}
+                    if event.safe_req_id
+                    else None
+                ),
                 retry=True,
                 retry_policy={
                     "max_retries": 1,
@@ -194,9 +187,9 @@ class QueueService(BaseQueueService):
                 serializer="raw",
             )
             logger.debug(
-                "Event sent with routing_key=%s headers=%s: %s",
+                "Event sent with routing_key=%s safe_req_id=%s: %s",
                 event.routing_key,
-                event.headers,
+                event.safe_req_id,
                 event.body,
             )
             return True
@@ -226,19 +219,19 @@ class QueueService(BaseQueueService):
             logger.warning("Could not acquire a producer from the pool: %s", exc)
         return total
 
-    def send_events(
-        self,
-        payloads: list[dict[str, Any]],
-        headers: Mapping[str, str] | None = None,
-    ) -> int:
+    def send_events(self, payloads: list[dict[str, Any]]) -> int:
         """
         Serialize and publish several payloads, acquiring a producer from the
         pool only once. Never raises: from the first failed event on, events
         are buffered, preserving order. On full success, also flush any
         previously buffered events.
 
+        Events carry the ``x-safe-req-id`` of the request being served, if any.
+        Buffered events keep their own when flushed later.
+
         :return: number of events published (payloads + any flushed unsent)
         """
+        safe_req_id = get_safe_req_id()
         events: list[BufferedEvent] = []
         for payload in payloads:
             try:
@@ -246,7 +239,7 @@ class QueueService(BaseQueueService):
                     BufferedEvent(
                         orjson.dumps(payload),
                         self._build_routing_key(payload),
-                        headers,
+                        safe_req_id,
                     )
                 )
             except Exception:
@@ -317,11 +310,7 @@ class QueueService(BaseQueueService):
 class MockedQueueService(BaseQueueService):
     """Used when EVENTS_QUEUE_URL is not configured."""
 
-    def send_events(
-        self,
-        payloads: list[dict[str, Any]],
-        headers: Mapping[str, str] | None = None,
-    ) -> int:
+    def send_events(self, payloads: list[dict[str, Any]]) -> int:
         logger.debug("MockedQueueService: Not sending %d events", len(payloads))
         return 0
 

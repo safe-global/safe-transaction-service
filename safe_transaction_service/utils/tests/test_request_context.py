@@ -1,13 +1,7 @@
 # SPDX-License-Identifier: FSL-1.1-MIT
 from django.test import SimpleTestCase
 
-from ..request_context import (
-    SAFE_REQ_ID_HEADER,
-    get_event_headers,
-    get_safe_req_id,
-    reset_safe_req_id,
-    set_safe_req_id,
-)
+from ..request_context import get_safe_req_id, reset_safe_req_id, set_safe_req_id
 
 SAFE_REQ_ID = "0123456789abcdef0123456789abcdef"
 
@@ -15,13 +9,11 @@ SAFE_REQ_ID = "0123456789abcdef0123456789abcdef"
 class TestRequestContext(SimpleTestCase):
     def test_safe_req_id_not_set(self):
         self.assertIsNone(get_safe_req_id())
-        self.assertIsNone(get_event_headers())
 
     def test_set_valid_safe_req_id(self):
         token = set_safe_req_id(SAFE_REQ_ID)
         try:
             self.assertEqual(get_safe_req_id(), SAFE_REQ_ID)
-            self.assertEqual(get_event_headers(), {SAFE_REQ_ID_HEADER: SAFE_REQ_ID})
         finally:
             reset_safe_req_id(token)
         self.assertIsNone(get_safe_req_id())
@@ -41,7 +33,6 @@ class TestRequestContext(SimpleTestCase):
                 token = set_safe_req_id(value)
                 try:
                     self.assertIsNone(get_safe_req_id())
-                    self.assertIsNone(get_event_headers())
                 finally:
                     reset_safe_req_id(token)
 

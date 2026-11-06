@@ -185,7 +185,7 @@ class TestQueueService(TestCase):
                 # Nothing is published while the transaction is open
                 send_events_mock.assert_not_called()
             self.assertEqual(len(callbacks), 1)
-            send_events_mock.assert_called_once_with(payloads, headers=None)
+            send_events_mock.assert_called_once_with(payloads)
 
     def test_send_events_on_commit_empty_list(self):
         # No callback is registered when there is nothing to send
@@ -194,72 +194,45 @@ class TestQueueService(TestCase):
             queue_service.send_events_on_commit([])
         self.assertEqual(callbacks, [])
 
-    def test_send_events_with_headers(self):
+    def test_send_events_sets_safe_req_id(self):
         queue_service = QueueService()
+        self._set_safe_req_id(SAFE_REQ_ID)
         payloads = [{"message": f"event {i}"} for i in range(2)]
-        headers = {SAFE_REQ_ID_HEADER: SAFE_REQ_ID}
-        self.assertEqual(queue_service.send_events(payloads, headers=headers), 2)
+        self.assertEqual(queue_service.send_events(payloads), 2)
         for payload in payloads:
             msg = self._get_raw_message()
             self.assertEqual(json.loads(msg.body), payload)
             self.assertEqual(msg.headers, {SAFE_REQ_ID_HEADER: SAFE_REQ_ID})
             self.assertEqual(msg.properties["app_id"], EVENTS_APP_ID)
-        # The mapping shared by the batch is not modified
-        self.assertEqual(headers, {SAFE_REQ_ID_HEADER: SAFE_REQ_ID})
 
-    def test_send_events_without_headers(self):
-        queue_service = QueueService()
-        queue_service.send_events([{"message": "no headers"}])
-        msg = self._get_raw_message()
-        self.assertNotIn(SAFE_REQ_ID_HEADER, msg.headers)
-
-    def test_send_events_on_commit_captures_safe_req_id_when_called(self):
-        queue_service = QueueService()
-        token = set_safe_req_id(SAFE_REQ_ID)
-        with self.captureOnCommitCallbacks(execute=True):
-            queue_service.send_events_on_commit([{"message": "on commit"}])
-            # The request is over before the transaction commits
-            reset_safe_req_id(token)
-            self._set_safe_req_id(OTHER_SAFE_REQ_ID)
-        msg = self._get_raw_message()
-        self.assertEqual(json.loads(msg.body), {"message": "on commit"})
-        self.assertEqual(msg.headers[SAFE_REQ_ID_HEADER], SAFE_REQ_ID)
-
-    def test_send_events_on_commit_without_transaction_sets_headers(self):
+    def test_send_event_sets_safe_req_id(self):
         queue_service = QueueService()
         self._set_safe_req_id(SAFE_REQ_ID)
-        with mock.patch.object(
-            queue_service_module.transaction, "get_connection"
-        ) as get_connection_mock:
-            get_connection_mock.return_value.in_atomic_block = False
-            with mock.patch.object(QueueService, "send_events") as send_events_mock:
-                queue_service.send_events_on_commit([{"message": "immediate"}])
-        send_events_mock.assert_called_once_with(
-            [{"message": "immediate"}], headers={SAFE_REQ_ID_HEADER: SAFE_REQ_ID}
+        queue_service.send_event({"message": "single"})
+        self.assertEqual(
+            self._get_raw_message().headers, {SAFE_REQ_ID_HEADER: SAFE_REQ_ID}
         )
 
-    def test_send_events_on_commit_without_safe_req_id(self):
+    def test_send_events_without_safe_req_id(self):
+        # e.g. events published by Celery tasks or the indexers
         queue_service = QueueService()
-        with self.captureOnCommitCallbacks(execute=True):
-            queue_service.send_events_on_commit([{"message": "from a task"}])
+        queue_service.send_events([{"message": "no request"}])
         self.assertNotIn(SAFE_REQ_ID_HEADER, self._get_raw_message().headers)
 
-    def test_buffered_event_keeps_its_headers(self):
+    def test_buffered_event_keeps_its_safe_req_id(self):
         queue_service = QueueService()
         queue_service.clear_unsent_events()
         token = set_safe_req_id(SAFE_REQ_ID)
         try:
             with mock.patch.object(QueueService, "_try_publish", return_value=False):
-                with self.captureOnCommitCallbacks(execute=True):
-                    queue_service.send_events_on_commit([{"message": "buffered"}])
+                queue_service.send_events([{"message": "buffered"}])
         finally:
             reset_safe_req_id(token)
         self.assertEqual(len(queue_service.unsent_events), 1)
 
         # Flushed while serving another request
         self._set_safe_req_id(OTHER_SAFE_REQ_ID)
-        with self.captureOnCommitCallbacks(execute=True):
-            queue_service.send_events_on_commit([{"message": "recovered"}])
+        queue_service.send_events([{"message": "recovered"}])
         recovered = self._get_raw_message()
         self.assertEqual(json.loads(recovered.body), {"message": "recovered"})
         self.assertEqual(recovered.headers[SAFE_REQ_ID_HEADER], OTHER_SAFE_REQ_ID)

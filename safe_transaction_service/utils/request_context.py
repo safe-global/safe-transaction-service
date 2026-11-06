@@ -27,9 +27,3 @@ def reset_safe_req_id(token: Token) -> None:
 
 def get_safe_req_id() -> str | None:
     return _safe_req_id.get()
-
-
-def get_event_headers() -> dict[str, str] | None:
-    if safe_req_id := get_safe_req_id():
-        return {SAFE_REQ_ID_HEADER: safe_req_id}
-    return None
