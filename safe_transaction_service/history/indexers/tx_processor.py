@@ -7,6 +7,7 @@ import dataclasses
 import logging
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
+from typing import Any
 
 from django.db import transaction
 
@@ -49,6 +50,11 @@ from ..models import (
     SafeStatus,
     post_bulk_create,
 )
+from ..services.event_service import (
+    build_safe_config_payloads,
+    send_payloads_on_commit,
+    take_safe_config_snapshot,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -79,6 +85,7 @@ class ProcessedResult:
     safe_relevant_transactions: list[SafeRelevantTransaction] = dataclasses.field(
         default_factory=list
     )
+    event_payloads: list[dict[str, Any]] = dataclasses.field(default_factory=list)
 
 
 class SafeTxProcessorProvider:
@@ -466,6 +473,7 @@ class SafeTxProcessor(TxProcessor):
 
         internal_tx_ids = []
         safe_relevant_txs: list[SafeRelevantTransaction] = []
+        event_payloads: list[dict[str, Any]] = []
         contract_addresses = {
             internal_tx_decoded.internal_tx._from
             for internal_tx_decoded in internal_txs_decoded
@@ -491,6 +499,7 @@ class SafeTxProcessor(TxProcessor):
                         safe_relevant_txs.extend(
                             processed_result.safe_relevant_transactions
                         )
+                        event_payloads.extend(processed_result.event_payloads)
                     except CannotFindPreviousTrace:
                         logger.critical(
                             "[%s] There's a problem with the RPC, it needs to be checked",
@@ -513,6 +522,8 @@ class SafeTxProcessor(TxProcessor):
                 SafeRelevantTransaction.objects.bulk_create(
                     safe_relevant_txs, ignore_conflicts=True
                 )
+
+            send_payloads_on_commit(event_payloads)
 
             # Set all as decoded in the same batch
             InternalTxDecoded.objects.filter(internal_tx__in=internal_tx_ids).update(
@@ -559,6 +570,7 @@ class SafeTxProcessor(TxProcessor):
         master_copy = internal_tx.to
         processed_successfully = True
         safe_relevant_txs: list[SafeRelevantTransaction] = []
+        previous_config = None
 
         if function_name == "setup" and contract_address != NULL_ADDRESS:
             # Index new Safes
@@ -592,6 +604,9 @@ class SafeTxProcessor(TxProcessor):
             )
         else:
             safe_last_status = self.get_last_safe_status_for_address(contract_address)
+            previous_config = take_safe_config_snapshot(
+                function_name, internal_tx, safe_last_status
+            )
             if not safe_last_status:
                 # Usually this happens from Safes coming from a not supported Master Copy
                 logger.debug(
@@ -918,4 +933,11 @@ class SafeTxProcessor(TxProcessor):
         return ProcessedResult(
             processed=processed_successfully,
             safe_relevant_transactions=safe_relevant_txs,
+            event_payloads=(
+                build_safe_config_payloads(
+                    previous_config, internal_tx, safe_last_status
+                )
+                if previous_config is not None
+                else []
+            ),
         )

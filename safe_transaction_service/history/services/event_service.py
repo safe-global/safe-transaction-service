@@ -1,19 +1,24 @@
 # SPDX-License-Identifier: FSL-1.1-MIT
 """
-Build event payloads for the queue
+Build event payloads for the queue and publish them
 """
 
-from datetime import timedelta
+import dataclasses
+from datetime import datetime, timedelta
 from logging import getLogger
 from typing import Any, Literal, TypedDict
 
+from django.conf import settings
 from django.db.models import Model
 from django.utils import timezone
 
+from eth_typing import ChecksumAddress
 from hexbytes import HexBytes
+from safe_eth.eth.constants import NULL_ADDRESS
 from safe_eth.safe.safe_signature import SafeSignatureType
 from safe_eth.util.util import to_0x_hex_str
 
+from safe_transaction_service.events.services.queue_service import get_queue_service
 from safe_transaction_service.history.helpers import build_transfer_unique_id
 from safe_transaction_service.history.models import (
     ERC20Transfer,
@@ -24,6 +29,7 @@ from safe_transaction_service.history.models import (
     MultisigTransaction,
     SafeContract,
     SafeContractDelegate,
+    SafeLastStatus,
     TokenTransfer,
     TransactionServiceEventType,
 )
@@ -35,6 +41,19 @@ from safe_transaction_service.tokens.services import TokenServiceProvider
 from safe_transaction_service.utils.ethereum import get_chain_id
 
 logger = getLogger(__name__)
+
+# Events are only sent for data at most this old, so reindexing does not send
+# them again
+EVENT_MAX_AGE = timedelta(minutes=60)
+
+
+def is_too_old_for_event(when: datetime) -> bool:
+    """
+    :param when: Moment the data of the event was created, modified or mined
+    :return: ``True`` if the data is older than ``EVENT_MAX_AGE``
+    """
+    return when + EVENT_MAX_AGE < timezone.now()
+
 
 # Transient (non-DB) attributes set by the indexers on transfer / ether ``InternalTx``
 # instances, telling whether the `to` / `_from` side is a tracked Safe. Used by
@@ -294,35 +313,45 @@ def filter_banned_payloads(payloads: list[dict[str, Any]]) -> list[dict[str, Any
     ]
 
 
+def send_payloads_on_commit(payloads: list[dict[str, Any]]) -> None:
+    """
+    Publish the payloads when the current database transaction commits,
+    excluding payloads addressed to a banned Safe. The banned set is cached
+    in memory, so bans propagate within ``BANNED_SAFES_CACHE_TTL``. Payloads
+    without an ``address`` are kept (e.g. delegate events not tied to a
+    Safe). Every event producer must publish through here
+
+    :param payloads:
+    :return:
+    """
+    if payloads_to_send := filter_banned_payloads(payloads):
+        get_queue_service().send_events_on_commit(payloads_to_send)
+
+
 def is_relevant_event(
     sender: type[Model],
     instance: TokenTransfer | InternalTx | MultisigConfirmation | MultisigTransaction,
     created: bool,
-    minutes: int = 60,
 ) -> bool:
     """
-    For `MultisigTransaction`, event is valid if the instance was modified in the last `minutes` minutes.
-    For the other instances, event is valid if the instance was created in the last `minutes` minutes.
+    For `MultisigTransaction`, event is valid if the instance was modified in the last `EVENT_MAX_AGE`.
+    For the other instances, event is valid if the instance was created in the last `EVENT_MAX_AGE`.
     This time restriction is important to prevent sending duplicate transactions when reindexing.
 
     :param sender:
     :param instance:
     :param created:
-    :param minutes: Minutes to allow an old event
     :return: `True` if event is valid, `False` otherwise
     """
     if (
         sender == MultisigTransaction
     ):  # Different logic, as `MultisigTransaction` can change from Pending to Executed
         # Don't send events for `not trusted` transactions
-        if (
-            not instance.trusted
-            or instance.modified + timedelta(minutes=minutes) < timezone.now()
-        ):
+        if not instance.trusted or is_too_old_for_event(instance.modified):
             return False
     elif not created:
         return False
-    elif instance.created + timedelta(minutes=minutes) < timezone.now():
+    elif is_too_old_for_event(instance.created):
         return False
     return True
 
@@ -399,3 +428,169 @@ def build_delete_delegate_payload(instance: SafeContractDelegate) -> DelegatePay
     return _build_delegate_payload(
         TransactionServiceEventType.DELETED_DELEGATE, instance
     )
+
+
+# Decoded Safe functions that can change the Safe configuration. The configuration
+# set by `setup` is notified with `SAFE_CREATED`
+SAFE_CONFIG_FUNCTIONS = frozenset(
+    {
+        "addOwnerWithThreshold",
+        "removeOwner",
+        "removeOwnerWithThreshold",
+        "swapOwner",
+        "changeThreshold",
+        "changeMasterCopy",
+        "setFallbackHandler",
+        "setGuard",
+        "setModuleGuard",
+        "enableModule",
+        "disableModule",
+    }
+)
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class SafeConfigSnapshot:
+    """
+    Copy of the configuration fields of a ``SafeLastStatus``. The lists are
+    copied, as the processor keeps mutating the same ``SafeLastStatus`` instance
+    for the next decoded txs of the batch.
+    """
+
+    owners: list[ChecksumAddress]
+    threshold: int
+    nonce: int
+    master_copy: ChecksumAddress
+    fallback_handler: ChecksumAddress
+    guard: ChecksumAddress
+    module_guard: ChecksumAddress
+    enabled_modules: list[ChecksumAddress]
+
+    @classmethod
+    def from_safe_status(cls, safe_status: SafeLastStatus) -> "SafeConfigSnapshot":
+        return cls(
+            owners=list(safe_status.owners),
+            threshold=safe_status.threshold,
+            nonce=safe_status.nonce,
+            master_copy=safe_status.master_copy,
+            fallback_handler=safe_status.fallback_handler,
+            guard=safe_status.guard or NULL_ADDRESS,
+            module_guard=safe_status.module_guard or NULL_ADDRESS,
+            enabled_modules=list(safe_status.enabled_modules),
+        )
+
+    def to_payload(self) -> dict[str, Any]:
+        return {
+            "owners": self.owners,
+            "threshold": self.threshold,
+            "nonce": self.nonce,
+            "enabledModules": self.enabled_modules,
+            "guard": self.guard,
+            "moduleGuard": self.module_guard,
+            "fallbackHandler": self.fallback_handler,
+            "masterCopy": self.master_copy,
+        }
+
+
+def take_safe_config_snapshot(
+    function_name: str,
+    internal_tx: InternalTx,
+    safe_status: SafeLastStatus | None,
+) -> SafeConfigSnapshot | None:
+    """
+    Take the configuration of the Safe before processing a decoded tx, to build
+    its ``SAFE_CONFIG_UPDATED`` payloads after with ``build_safe_config_payloads``.
+    The age is checked with the block timestamp, the same as ``MODULE_TRANSACTION``
+    events.
+
+    :param function_name: Decoded function about to be processed
+    :param internal_tx: Internal tx about to be processed
+    :param safe_status: Safe status before processing the decoded tx
+    :return: Snapshot, or ``None`` if no event must be sent for the decoded tx
+    """
+    if (
+        function_name not in SAFE_CONFIG_FUNCTIONS
+        or safe_status is None
+        or settings.DISABLE_SERVICE_EVENTS
+        or is_too_old_for_event(internal_tx.timestamp)
+    ):
+        return None
+    return SafeConfigSnapshot.from_safe_status(safe_status)
+
+
+def build_safe_config_payloads(
+    previous_config: SafeConfigSnapshot,
+    internal_tx: InternalTx,
+    safe_status: SafeLastStatus,
+) -> list[dict[str, Any]]:
+    """
+    Build one ``SAFE_CONFIG_UPDATED`` payload per configuration change made by a
+    decoded tx, following the Safe contract events: a swapped owner is a removed
+    owner plus an added owner, and the threshold is only reported when its value
+    changes.
+
+    :param previous_config: Snapshot returned by ``take_safe_config_snapshot``
+    :param internal_tx: Processed internal tx
+    :param safe_status: Safe status after processing the decoded tx
+    :return: Payloads, empty if nothing changed
+    """
+    new_config = SafeConfigSnapshot.from_safe_status(safe_status)
+    changes: list[tuple[str, dict[str, Any]]] = []
+    changes.extend(
+        ("REMOVED_OWNER", {"owner": owner})
+        for owner in previous_config.owners
+        if owner not in new_config.owners
+    )
+    changes.extend(
+        ("ADDED_OWNER", {"owner": owner})
+        for owner in new_config.owners
+        if owner not in previous_config.owners
+    )
+    if previous_config.threshold != new_config.threshold:
+        changes.append(("CHANGED_THRESHOLD", {"threshold": new_config.threshold}))
+    changes.extend(
+        ("DISABLED_MODULE", {"module": module})
+        for module in previous_config.enabled_modules
+        if module not in new_config.enabled_modules
+    )
+    changes.extend(
+        ("ENABLED_MODULE", {"module": module})
+        for module in new_config.enabled_modules
+        if module not in previous_config.enabled_modules
+    )
+    if previous_config.guard != new_config.guard:
+        changes.append(("CHANGED_GUARD", {"guard": new_config.guard}))
+    if previous_config.module_guard != new_config.module_guard:
+        changes.append(
+            ("CHANGED_MODULE_GUARD", {"moduleGuard": new_config.module_guard})
+        )
+    if previous_config.fallback_handler != new_config.fallback_handler:
+        changes.append(
+            (
+                "CHANGED_FALLBACK_HANDLER",
+                {"fallbackHandler": new_config.fallback_handler},
+            )
+        )
+    if previous_config.master_copy != new_config.master_copy:
+        changes.append(("CHANGED_MASTER_COPY", {"masterCopy": new_config.master_copy}))
+
+    if not changes:
+        return []
+
+    timestamp = int(internal_tx.timestamp.timestamp())
+    tx_hash = to_0x_hex_str(HexBytes(internal_tx.ethereum_tx_id))
+    status = new_config.to_payload()
+    chain_id = str(get_chain_id())
+    return [
+        {
+            "timestamp": timestamp,
+            "address": safe_status.address,
+            "type": TransactionServiceEventType.SAFE_CONFIG_UPDATED.name,
+            "txHash": tx_hash,
+            "change": change,
+            "data": change_data,
+            "status": status,
+            "chainId": chain_id,
+        }
+        for change, change_data in changes
+    ]

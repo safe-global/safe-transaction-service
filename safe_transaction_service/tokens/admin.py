@@ -14,6 +14,7 @@ class TokenAdmin(AdvancedAdminSearchMixin, admin.ModelAdmin):
     list_display = (
         "address",
         "trusted",
+        "trusted_admin",
         "spam",
         "events_bugged",
         "name",
@@ -21,7 +22,17 @@ class TokenAdmin(AdvancedAdminSearchMixin, admin.ModelAdmin):
         "decimals",
         "copy_price",
     )
-    list_filter = ("trusted", "spam", "events_bugged", "decimals", HasLogoFilterAdmin)
+    list_filter = (
+        "trusted",
+        "trusted_admin",
+        "spam",
+        "events_bugged",
+        "decimals",
+        HasLogoFilterAdmin,
+    )
+    # `trusted` is owned by `update_token_info_from_token_list_task`, curation must go
+    # through `trusted_admin` so it is not wiped on the next run
+    readonly_fields = ("trusted",)
     ordering = ("address",)
     search_fields = ["==address", "symbol", "name", "==copy_price"]
 

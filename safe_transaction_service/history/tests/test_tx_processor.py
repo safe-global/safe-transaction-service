@@ -11,6 +11,7 @@ from eth_account import Account
 from eth_utils import keccak
 from hexbytes import HexBytes
 from safe_eth.eth import EthereumNetwork
+from safe_eth.eth.constants import NULL_ADDRESS
 from safe_eth.eth.ethereum_client import TracingManager
 from safe_eth.eth.utils import fast_keccak_text
 from safe_eth.safe.safe_signature import SafeSignatureType
@@ -1019,3 +1020,201 @@ class TestSafeTxProcessor(SafeTestCaseMixin, TestCase):
         safe_last_status_db = SafeLastStatus.objects.get()
         self.assertEqual(safe_last_status_db.address, safe_address)
         self.assertEqual(safe_last_status_db.nonce, 1)
+
+    def build_safe_config_payload(
+        self,
+        internal_tx_decoded: InternalTxDecoded,
+        change: str,
+        data: dict,
+        safe_last_status: SafeLastStatus,
+        owners: list[str],
+        threshold: int,
+        enabled_modules: list[str] | None = None,
+    ) -> dict:
+        internal_tx = internal_tx_decoded.internal_tx
+        return {
+            "timestamp": int(internal_tx.timestamp.timestamp()),
+            "address": safe_last_status.address,
+            "type": TransactionServiceEventType.SAFE_CONFIG_UPDATED.name,
+            "txHash": to_0x_hex_str(HexBytes(internal_tx.ethereum_tx_id)),
+            "change": change,
+            "data": data,
+            "status": {
+                "owners": owners,
+                "threshold": threshold,
+                "nonce": safe_last_status.nonce,
+                "enabledModules": enabled_modules or [],
+                "guard": safe_last_status.guard or NULL_ADDRESS,
+                "moduleGuard": safe_last_status.module_guard or NULL_ADDRESS,
+                "fallbackHandler": safe_last_status.fallback_handler,
+                "masterCopy": safe_last_status.master_copy,
+            },
+            "chainId": str(EthereumNetwork.GANACHE.value),
+        }
+
+    @mock.patch.object(QueueService, "send_events")
+    def test_tx_processor_config_changes_send_events(self, send_events_mock: MagicMock):
+        """
+        Config changes of a batch are sent in a single publish, in order.
+        """
+        owner = Account.create().address
+        new_owner = Account.create().address
+        safe_last_status = SafeLastStatusFactory(owners=[owner], threshold=1)
+        safe_address = safe_last_status.address
+        # L1: one decoded call changes the owners and the threshold
+        add_owner_tx = InternalTxDecodedFactory(
+            function_name="addOwnerWithThreshold",
+            owner=new_owner,
+            threshold=2,
+            internal_tx___from=safe_address,
+            internal_tx__value=0,
+        )
+        change_threshold_tx = InternalTxDecodedFactory(
+            function_name="changeThreshold",
+            threshold=1,
+            internal_tx___from=safe_address,
+            internal_tx__value=0,
+        )
+
+        with self.captureOnCommitCallbacks(execute=True):
+            self.tx_processor.process_decoded_transactions(
+                [add_owner_tx, change_threshold_tx]
+            )
+
+        # Every event of the batch is published together
+        owners = [new_owner, owner]
+        send_events_mock.assert_called_once_with(
+            [
+                self.build_safe_config_payload(
+                    add_owner_tx,
+                    "ADDED_OWNER",
+                    {"owner": new_owner},
+                    safe_last_status,
+                    owners,
+                    2,
+                ),
+                self.build_safe_config_payload(
+                    add_owner_tx,
+                    "CHANGED_THRESHOLD",
+                    {"threshold": 2},
+                    safe_last_status,
+                    owners,
+                    2,
+                ),
+                self.build_safe_config_payload(
+                    change_threshold_tx,
+                    "CHANGED_THRESHOLD",
+                    {"threshold": 1},
+                    safe_last_status,
+                    owners,
+                    1,
+                ),
+            ]
+        )
+
+    @mock.patch.object(QueueService, "send_events")
+    def test_tx_processor_config_change_without_threshold_sends_event(
+        self, send_events_mock: MagicMock
+    ):
+        """
+        An owner added without threshold (L2) sends only ``ADDED_OWNER``.
+        """
+        # L2: `AddedOwner` is decoded without threshold, `ChangedThreshold` comes
+        # as a separate event
+        owner = Account.create().address
+        new_owner = Account.create().address
+        safe_last_status = SafeLastStatusFactory(owners=[owner], threshold=1)
+        add_owner_tx = InternalTxDecodedFactory(
+            function_name="addOwnerWithThreshold",
+            arguments={"owner": new_owner, "_threshold": None},
+            internal_tx___from=safe_last_status.address,
+            internal_tx__value=0,
+        )
+
+        with self.captureOnCommitCallbacks(execute=True):
+            self.tx_processor.process_decoded_transactions([add_owner_tx])
+
+        send_events_mock.assert_called_once_with(
+            [
+                self.build_safe_config_payload(
+                    add_owner_tx,
+                    "ADDED_OWNER",
+                    {"owner": new_owner},
+                    safe_last_status,
+                    [new_owner, owner],
+                    1,
+                ),
+            ]
+        )
+
+    @mock.patch.object(QueueService, "send_events")
+    def test_tx_processor_failed_config_change_sends_no_event(
+        self, send_events_mock: MagicMock
+    ):
+        """
+        A config change that cannot be applied sends no event.
+        """
+        owner = Account.create().address
+        safe_last_status = SafeLastStatusFactory(owners=[owner], threshold=1)
+        safe_address = safe_last_status.address
+        failing_remove_owner_tx = InternalTxDecodedFactory(
+            function_name="removeOwner",
+            old_owner=Account.create().address,
+            threshold=1,
+            internal_tx___from=safe_address,
+            internal_tx__value=0,
+        )
+        enable_module_tx = InternalTxDecodedFactory(
+            function_name="enableModule",
+            internal_tx___from=safe_address,
+            internal_tx__value=0,
+        )
+        module = enable_module_tx.arguments["module"]
+
+        with self.captureOnCommitCallbacks(execute=True):
+            with self.assertLogs(
+                "safe_transaction_service.history.indexers.tx_processor",
+                level="ERROR",
+            ):
+                results = self.tx_processor.process_decoded_transactions(
+                    [failing_remove_owner_tx, enable_module_tx]
+                )
+
+        self.assertEqual(results, [False, True])
+        send_events_mock.assert_called_once_with(
+            [
+                self.build_safe_config_payload(
+                    enable_module_tx,
+                    "ENABLED_MODULE",
+                    {"module": module},
+                    safe_last_status,
+                    [owner],
+                    1,
+                    enabled_modules=[module],
+                ),
+            ]
+        )
+
+    @mock.patch.object(QueueService, "send_events")
+    def test_tx_processor_old_config_change_sends_no_event(
+        self, send_events_mock: MagicMock
+    ):
+        """
+        Config changes older than the event window send no event.
+        """
+        safe_last_status = SafeLastStatusFactory(threshold=1)
+        change_threshold_tx = InternalTxDecodedFactory(
+            function_name="changeThreshold",
+            threshold=2,
+            internal_tx___from=safe_last_status.address,
+            internal_tx__value=0,
+            internal_tx__timestamp=timezone.now() - timedelta(hours=2),
+        )
+
+        with self.captureOnCommitCallbacks(execute=True):
+            self.tx_processor.process_decoded_transactions([change_threshold_tx])
+
+        self.assertEqual(
+            SafeLastStatus.objects.get(address=safe_last_status.address).threshold, 2
+        )
+        send_events_mock.assert_not_called()

@@ -83,6 +83,40 @@ class TestModels(TestCase):
 
         self.assertIn("SPAM", str(spam_tokens[0]))
 
+    def test_token_trusted_admin(self):
+        token = TokenFactory(trusted=False)
+        self.assertFalse(token.trusted_admin)
+
+        # `set_trusted` is for automatic sources, it does not curate
+        token.set_trusted()
+        token.refresh_from_db()
+        self.assertTrue(token.trusted)
+        self.assertFalse(token.trusted_admin)
+
+        token.set_trusted_admin()
+        token.refresh_from_db()
+        self.assertTrue(token.trusted)
+        self.assertTrue(token.trusted_admin)
+
+        # `save` marks as trusted any manually curated token
+        token = TokenFactory(trusted=False)
+        token.trusted_admin = True
+        token.save()
+        token.refresh_from_db()
+        self.assertTrue(token.trusted)
+
+        # Clearing the curation leaves `trusted` alone, it belongs to the task
+        token.trusted_admin = False
+        token.save()
+        token.refresh_from_db()
+        self.assertTrue(token.trusted)
+
+    def test_token_trusted_admin_spam_validation(self):
+        token = TokenFactory(spam=True, trusted=False)
+        token.trusted_admin = True
+        with self.assertRaises(ValidationError):
+            token.clean()
+
     def test_token_create_truncate(self):
         max_length = 60
         long_name = "CHA" + "NA" * 30 + " BATMAN"
