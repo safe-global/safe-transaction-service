@@ -8,6 +8,8 @@ from dataclasses import asdict, dataclass
 from celery._state import get_current_task
 from celery.app.log import TaskFormatter
 
+from safe_transaction_service.utils.request_context import get_safe_req_id
+
 
 @dataclass()
 class HttpRequestLog:
@@ -49,6 +51,7 @@ class ContextMessageLog:
     errorInfo: ErrorInfo | None = None
     taskInfo: TaskInfo | None = None
     extraData: dict | None = None
+    requestId: str | None = None
 
 
 @dataclass
@@ -135,6 +138,7 @@ class SafeJsonFormatter(logging.Formatter):
             errorInfo=getattr(record, "error_detail", None),
             taskInfo=getattr(record, "task_detail", None),
             extraData=getattr(record, "extra_data", None),
+            requestId=get_safe_req_id(),
         )
 
         json_log = JsonLog(

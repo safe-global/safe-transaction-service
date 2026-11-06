@@ -28,8 +28,11 @@ from safe_eth.util.util import to_0x_hex_str
 from ...contracts.models import ContractQuerySet
 from ...contracts.tests.factories import ContractFactory
 from ...contracts.tx_decoder import DbTxDecoder
+from ...events.services.queue_service import QueueService
 from ...tokens.models import Token
 from ...tokens.tests.factories import TokenFactory
+from ...utils.request_context import SAFE_REQ_ID_HEADER
+from ...utils.tests.constants import SAFE_REQ_ID
 from ...utils.utils import datetime_to_str
 from ..helpers import DelegateSignatureHelperV2, DeleteMultisigTxSignatureHelper
 from ..models import (
@@ -37,6 +40,7 @@ from ..models import (
     MultisigTransaction,
     SafeContractDelegate,
     SafeLastStatus,
+    TransactionServiceEventType,
 )
 from ..serializers import TransferType
 from ..views_v2 import SafeMultisigTransactionListView
@@ -1353,6 +1357,66 @@ class TestViewsV2V150(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIsNone(response.data["executor"])
         self.assertEqual(len(response.data["confirmations"]), 0)
+
+    def test_post_multisig_transactions_publishes_safe_req_id(self):
+        """Events published by a transaction proposal carry the request id"""
+        safe_owner = Account.create()
+        safe = self.deploy_test_safe(owners=[safe_owner.address])
+        safe_tx = safe.build_multisig_tx(Account.create().address, 1, b"", safe_nonce=0)
+        data = {
+            "to": safe_tx.to,
+            "value": safe_tx.value,
+            "data": None,
+            "operation": safe_tx.operation,
+            "nonce": safe_tx.safe_nonce,
+            "safeTxGas": safe_tx.safe_tx_gas,
+            "baseGas": safe_tx.base_gas,
+            "gasPrice": safe_tx.gas_price,
+            "gasToken": safe_tx.gas_token,
+            "refundReceiver": safe_tx.refund_receiver,
+            "contractTransactionHash": to_0x_hex_str(safe_tx.safe_tx_hash),
+            "sender": safe_owner.address,
+            "signature": to_0x_hex_str(
+                safe_owner.unsafe_sign_hash(safe_tx.safe_tx_hash)["signature"]
+            ),
+        }
+        published = []
+        # TestCase never commits: captureOnCommitCallbacks would run the callbacks
+        # after the response, once the middleware has cleared the id. Publish
+        # right away instead, as production does when committing in the request
+        with (
+            mock.patch.object(
+                QueueService,
+                "send_events_on_commit",
+                autospec=True,
+                side_effect=lambda queue_service, payloads: queue_service.send_events(
+                    payloads
+                ),
+            ),
+            mock.patch.object(
+                QueueService,
+                "_publish_events",
+                autospec=True,
+                side_effect=lambda _, events: published.extend(events) or len(events),
+            ),
+        ):
+            response = self.client.post(
+                reverse("v2:history:multisig-transactions", args=(safe.address,)),
+                format="json",
+                data=data,
+                headers={SAFE_REQ_ID_HEADER: SAFE_REQ_ID},
+            )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        for event in published:
+            self.assertEqual(event.safe_req_id, SAFE_REQ_ID)
+        self.assertEqual(
+            {json.loads(event.body)["type"] for event in published},
+            {
+                TransactionServiceEventType.PENDING_MULTISIG_TRANSACTION.name,
+                TransactionServiceEventType.NEW_CONFIRMATION.name,
+            },
+        )
 
     def test_post_multisig_transactions(self):
         safe_owner_1 = Account.create()
