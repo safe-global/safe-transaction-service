@@ -2659,3 +2659,4 @@ class TransactionServiceEventType(Enum):
     NEW_DELEGATE = 14
     UPDATED_DELEGATE = 15
     DELETED_DELEGATE = 16
+    SAFE_CONFIG_UPDATED = 17
