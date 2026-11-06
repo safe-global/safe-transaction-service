@@ -1381,7 +1381,9 @@ class TestViewsV2V150(SafeTestCaseMixin, APITestCase):
             ),
         }
         published = []
-
+        # TestCase never commits: captureOnCommitCallbacks would run the callbacks
+        # after the response, once the middleware has cleared the id. Publish
+        # right away instead, as production does when committing in the request
         with (
             mock.patch.object(
                 QueueService,
