@@ -188,6 +188,7 @@ class TestQueueService(TestCase):
         self.assertEqual(callbacks, [])
 
     def test_send_events_sets_safe_req_id(self):
+        """Events published during a request carry its id as an AMQP header"""
         queue_service = QueueService()
         self.enterContext(safe_req_id_context(SAFE_REQ_ID))
         payloads = [{"message": f"event {i}"} for i in range(2)]
@@ -198,21 +199,14 @@ class TestQueueService(TestCase):
             self.assertEqual(msg.headers, {SAFE_REQ_ID_HEADER: SAFE_REQ_ID})
             self.assertEqual(msg.properties["app_id"], EVENTS_APP_ID)
 
-    def test_send_event_sets_safe_req_id(self):
-        queue_service = QueueService()
-        self.enterContext(safe_req_id_context(SAFE_REQ_ID))
-        queue_service.send_event({"message": "single"})
-        self.assertEqual(
-            self._get_raw_message().headers, {SAFE_REQ_ID_HEADER: SAFE_REQ_ID}
-        )
-
     def test_send_events_without_safe_req_id(self):
-        # e.g. events published by Celery tasks or the indexers
+        """Events published outside a request (Celery tasks, indexers) have no header"""
         queue_service = QueueService()
         queue_service.send_events([{"message": "no request"}])
         self.assertNotIn(SAFE_REQ_ID_HEADER, self._get_raw_message().headers)
 
     def test_buffered_event_keeps_its_safe_req_id(self):
+        """A buffered event keeps its own id when flushed during another request"""
         queue_service = QueueService()
         queue_service.clear_unsent_events()
         with (

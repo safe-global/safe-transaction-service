@@ -159,6 +159,7 @@ class TestMessageViews(SafeTestCaseMixin, APITestCase):
     def test_safe_messages_create_view_publishes_safe_req_id(
         self, get_owners_mock: MagicMock
     ):
+        """Events published by a new message carry the request id"""
         safe_req_id = "0123456789abcdef0123456789abcdef"
         account = Account.create()
         get_owners_mock.return_value = [account.address]

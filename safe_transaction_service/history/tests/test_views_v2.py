@@ -1357,6 +1357,7 @@ class TestViewsV2V150(SafeTestCaseMixin, APITestCase):
         self.assertEqual(len(response.data["confirmations"]), 0)
 
     def test_post_multisig_transactions_publishes_safe_req_id(self):
+        """Events published by a transaction proposal carry the request id"""
         safe_req_id = "0123456789abcdef0123456789abcdef"
         safe_owner = Account.create()
         safe = self.deploy_test_safe(owners=[safe_owner.address])

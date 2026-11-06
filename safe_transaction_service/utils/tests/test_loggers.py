@@ -68,6 +68,7 @@ class TestLoggers(TestCase):
         )
 
     def test_safe_json_formatter_request_id(self):
+        """JSON logs include requestId only while a request id is set"""
         record = LogRecord(
             "name", logging.INFO, "/", 2, "Test message", args=(), exc_info=None
         )

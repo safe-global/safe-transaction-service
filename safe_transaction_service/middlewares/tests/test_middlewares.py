@@ -43,36 +43,30 @@ class TestMiddlewares(unittest.TestCase):
         )
         self.assertEqual(request.get_full_path(), "/prefix/test/path")
 
-    def _call_safe_request_id_middleware(self, headers: dict[str, str] | None = None):
-        seen = []
-
-        def get_response(request):
-            seen.append(get_safe_req_id())
-            return "middleware_response"
-
-        request = RequestFactory().get("/test/path", headers=headers)
-        response = SafeRequestIdMiddleware(get_response)(request)
-        return response, seen[0]
-
     def test_safe_request_id_middleware(self):
-        response, seen = self._call_safe_request_id_middleware(
-            {"x-safe-req-id": SAFE_REQ_ID}
-        )
-        self.assertEqual(response, "middleware_response")
-        self.assertEqual(seen, SAFE_REQ_ID)
-        self.assertIsNone(get_safe_req_id())
-
-        _, seen = self._call_safe_request_id_middleware({"X-Safe-Req-Id": SAFE_REQ_ID})
-        self.assertEqual(seen, SAFE_REQ_ID)
+        """The header is set while serving the request and cleared after"""
+        get_response = MagicMock(side_effect=lambda request: get_safe_req_id())
+        middleware = SafeRequestIdMiddleware(get_response)
+        for header in ("x-safe-req-id", "X-Safe-Req-Id"):
+            with self.subTest(header=header):
+                request = RequestFactory().get(
+                    "/test/path", headers={header: SAFE_REQ_ID}
+                )
+                self.assertEqual(middleware(request), SAFE_REQ_ID)
+                self.assertIsNone(get_safe_req_id())
 
 
 class TestSafeRequestIdMiddlewareOrder(TestCase):
     def test_request_id_is_set_when_logging_middleware_logs(self):
-        seen = []
+        """
+        LoggingMiddleware logs after the response, so SafeRequestIdMiddleware
+        must run before it for the "Http request" line to have the id
+        """
+        seen_safe_req_ids = []
 
         class RecordSafeReqIdHandler(logging.Handler):
             def emit(self, record):
-                seen.append(get_safe_req_id())
+                seen_safe_req_ids.append(get_safe_req_id())
 
         logger = logging.getLogger("LoggingMiddleware")
         handler = RecordSafeReqIdHandler()
@@ -86,4 +80,4 @@ class TestSafeRequestIdMiddlewareOrder(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(seen, [SAFE_REQ_ID])
+        self.assertEqual(seen_safe_req_ids, [SAFE_REQ_ID])
