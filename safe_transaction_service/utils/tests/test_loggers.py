@@ -8,6 +8,7 @@ from django.test import TestCase
 
 from ...loggers.custom_logger import IgnoreSucceededNone, SafeJsonFormatter
 from ..request_context import safe_req_id_context
+from .constants import SAFE_REQ_ID
 
 
 class TestLoggers(TestCase):
@@ -77,9 +78,8 @@ class TestLoggers(TestCase):
             json.loads(SafeJsonFormatter().format(record))["contextMessage"],
         )
 
-        safe_req_id = "0123456789abcdef0123456789abcdef"
-        with safe_req_id_context(safe_req_id):
+        with safe_req_id_context(SAFE_REQ_ID):
             context_message = json.loads(SafeJsonFormatter().format(record))[
                 "contextMessage"
             ]
-        self.assertEqual(context_message["requestId"], safe_req_id)
+        self.assertEqual(context_message["requestId"], SAFE_REQ_ID)

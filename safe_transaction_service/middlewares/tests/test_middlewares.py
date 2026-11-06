@@ -6,11 +6,10 @@ from unittest.mock import MagicMock
 from django.test import RequestFactory, TestCase
 from django.urls import reverse
 
-from ...utils.request_context import get_safe_req_id
+from ...utils.request_context import SAFE_REQ_ID_HEADER, get_safe_req_id
+from ...utils.tests.constants import SAFE_REQ_ID
 from ..proxy_prefix_middleware import ProxyPrefixMiddleware
 from ..safe_request_id_middleware import SafeRequestIdMiddleware
-
-SAFE_REQ_ID = "0123456789abcdef0123456789abcdef"
 
 
 class TestMiddlewares(unittest.TestCase):
@@ -47,7 +46,7 @@ class TestMiddlewares(unittest.TestCase):
         """The header is set while serving the request and cleared after"""
         get_response = MagicMock(side_effect=lambda request: get_safe_req_id())
         middleware = SafeRequestIdMiddleware(get_response)
-        for header in ("x-safe-req-id", "X-Safe-Req-Id"):
+        for header in (SAFE_REQ_ID_HEADER, "X-Safe-Req-Id"):
             with self.subTest(header=header):
                 request = RequestFactory().get(
                     "/test/path", headers={header: SAFE_REQ_ID}
@@ -76,7 +75,7 @@ class TestSafeRequestIdMiddlewareOrder(TestCase):
         logger.setLevel(logging.INFO)
 
         response = self.client.get(
-            reverse("v1:history:about"), headers={"x-safe-req-id": SAFE_REQ_ID}
+            reverse("v1:history:about"), headers={SAFE_REQ_ID_HEADER: SAFE_REQ_ID}
         )
 
         self.assertEqual(response.status_code, 200)

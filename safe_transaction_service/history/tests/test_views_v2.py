@@ -31,6 +31,8 @@ from ...contracts.tx_decoder import DbTxDecoder
 from ...events.services.queue_service import QueueService
 from ...tokens.models import Token
 from ...tokens.tests.factories import TokenFactory
+from ...utils.request_context import SAFE_REQ_ID_HEADER
+from ...utils.tests.constants import SAFE_REQ_ID
 from ...utils.utils import datetime_to_str
 from ..helpers import DelegateSignatureHelperV2, DeleteMultisigTxSignatureHelper
 from ..models import (
@@ -1358,7 +1360,6 @@ class TestViewsV2V150(SafeTestCaseMixin, APITestCase):
 
     def test_post_multisig_transactions_publishes_safe_req_id(self):
         """Events published by a transaction proposal carry the request id"""
-        safe_req_id = "0123456789abcdef0123456789abcdef"
         safe_owner = Account.create()
         safe = self.deploy_test_safe(owners=[safe_owner.address])
         safe_tx = safe.build_multisig_tx(Account.create().address, 1, b"", safe_nonce=0)
@@ -1380,9 +1381,7 @@ class TestViewsV2V150(SafeTestCaseMixin, APITestCase):
             ),
         }
         published = []
-        # Django's TestCase only runs `on_commit` callbacks once the request has
-        # returned. In production the commit happens while the request is still
-        # served, so publish right away, as it does with no transaction open
+
         with (
             mock.patch.object(
                 QueueService,
@@ -1403,12 +1402,12 @@ class TestViewsV2V150(SafeTestCaseMixin, APITestCase):
                 reverse("v2:history:multisig-transactions", args=(safe.address,)),
                 format="json",
                 data=data,
-                headers={"x-safe-req-id": safe_req_id},
+                headers={SAFE_REQ_ID_HEADER: SAFE_REQ_ID},
             )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
         for event in published:
-            self.assertEqual(event.safe_req_id, safe_req_id)
+            self.assertEqual(event.safe_req_id, SAFE_REQ_ID)
         self.assertEqual(
             {json.loads(event.body)["type"] for event in published},
             {

@@ -2,8 +2,8 @@
 from django.test import SimpleTestCase
 
 from ..request_context import get_safe_req_id, safe_req_id_context
+from .constants import SAFE_REQ_ID
 
-SAFE_REQ_ID = "0123456789abcdef0123456789abcdef"
 LOGGER_NAME = "safe_transaction_service.utils.request_context"
 
 

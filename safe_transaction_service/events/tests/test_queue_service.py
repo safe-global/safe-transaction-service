@@ -11,6 +11,7 @@ from kombu.exceptions import LimitExceeded
 from kombu.pools import get_limit
 
 from ...utils.request_context import SAFE_REQ_ID_HEADER, safe_req_id_context
+from ...utils.tests.constants import SAFE_REQ_ID
 from ..services import queue_service as queue_service_module
 from ..services.queue_service import (
     EVENTS_APP_ID,
@@ -19,7 +20,6 @@ from ..services.queue_service import (
     get_queue_service,
 )
 
-SAFE_REQ_ID = "0123456789abcdef0123456789abcdef"
 OTHER_SAFE_REQ_ID = "fedcba9876543210fedcba9876543210"
 
 
