@@ -79,11 +79,9 @@ jobs:
         ports:
           - "5672:5672"
     steps:
-    - name: Setup and run ganache
-      run: |
-        docker network create ganache
-        docker run --detach --publish 8545:8545 --network ganache -e DOCKER=true trufflesuite/ganache:latest --defaultBalanceEther 10000 --gasLimit 10000000 -a 30 --chain.chainId 1337 --chain.networkId 1337 -d
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+    - name: Run anvil
+      run: docker compose --profile develop up --detach --wait anvil
     - name: Install uv
       uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
       with:

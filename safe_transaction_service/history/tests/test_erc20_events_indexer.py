@@ -53,6 +53,7 @@ class TestErc20EventsIndexer(EthereumTestCaseMixin, TestCase):
         tx_hash = self.ethereum_client.erc20.send_tokens(
             safe_contract.address, amount, erc20_contract.address, account.key
         )
+        self.wait_for_receipt(tx_hash)
 
         self.assertFalse(EthereumTx.objects.filter(tx_hash=tx_hash).exists())
         self.assertFalse(

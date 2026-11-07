@@ -3466,7 +3466,7 @@ wheels = [
 
 [[package]]
 name = "safe-eth-py"
-version = "7.27.0"
+version = "7.29.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "packaging" },
@@ -3475,9 +3475,9 @@ dependencies = [
     { name = "safe-pysha3" },
     { name = "web3" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/14/38/191d04af60fd93c8e91b71702eb1e342abf9c127fcc649ec31d0cbfc872f/safe_eth_py-7.27.0.tar.gz", hash = "sha256:0d11f0e9ffc9b2f9ca359b9e6216d1748c9c8339c4d2d7258435b65291e15050", size = 895059, upload-time = "2026-10-22T09:52:22.564Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/37/dd/b02791a4210d02a119d925baa4927bd20c97b1a727e50821be7abd1dda24/safe_eth_py-7.29.1.tar.gz", hash = "sha256:bea81a3f1d89a28b4f9704421cfe06347a63fbc32d02a52651647baabd99db18", size = 898143, upload-time = "2026-11-05T16:21:54.526Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c3/bb/81a195fee0cb411cf2e18c0fd8394cb95f54b607d8f1b01fd49a49aea862/safe_eth_py-7.27.0-py3-none-any.whl", hash = "sha256:3ce4b763f99ff1f78bdd3578d052e6082992ddb47f418b59c9ba4dedd0ba86c8", size = 1018530, upload-time = "2026-10-22T09:52:21.034Z" },
+    { url = "https://files.pythonhosted.org/packages/b4/98/fa810feb9f2a32af3966f457c28888c4b066ec77d95c07aa4efecd326466/safe_eth_py-7.29.1-py3-none-any.whl", hash = "sha256:ab713fb1789d80326f90785857449b2c2706ef31bd66becbfabff67d624c2153", size = 1021788, upload-time = "2026-11-05T16:21:53.149Z" },
 ]
 
 [package.optional-dependencies]
@@ -3599,7 +3599,7 @@ requires-dist = [
     { name = "psycopg", extras = ["binary", "pool"], specifier = "==3.3.6" },
     { name = "redis", extras = ["hiredis"], specifier = "==8.1.0" },
     { name = "requests", specifier = "==2.34.2" },
-    { name = "safe-eth-py", extras = ["django"], specifier = "==7.27.0" },
+    { name = "safe-eth-py", extras = ["django"], specifier = "==7.29.1" },
     { name = "web3", specifier = "==7.16.0" },
 ]
 
