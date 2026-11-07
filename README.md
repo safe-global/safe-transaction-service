@@ -67,6 +67,9 @@ docker-compose build --force-rm
 docker-compose up
 ```
 
+To spread requests over several nodes with retries and failover, `ETHEREUM_NODE_URL` can point at a
+self-hosted RPC proxy such as [eRPC](https://github.com/erpc/erpc) (e.g. `http://erpc:4000/main/evm/1`).
+
 For more parameters check [base.py](config/settings/base.py) file.
 
 ### Setup for a custom network
