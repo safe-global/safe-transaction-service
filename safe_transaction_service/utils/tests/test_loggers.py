@@ -7,6 +7,8 @@ from logging import LogRecord
 from django.test import TestCase
 
 from ...loggers.custom_logger import IgnoreSucceededNone, SafeJsonFormatter
+from ..request_context import safe_req_id_context
+from .constants import SAFE_REQ_ID
 
 
 class TestLoggers(TestCase):
@@ -65,3 +67,19 @@ class TestLoggers(TestCase):
         self.assertEqual(
             json.loads(SafeJsonFormatter().format(record))["timestamp"], 1700000000123
         )
+
+    def test_safe_json_formatter_request_id(self):
+        """JSON logs include requestId only while a request id is set"""
+        record = LogRecord(
+            "name", logging.INFO, "/", 2, "Test message", args=(), exc_info=None
+        )
+        self.assertNotIn(
+            "requestId",
+            json.loads(SafeJsonFormatter().format(record))["contextMessage"],
+        )
+
+        with safe_req_id_context(SAFE_REQ_ID):
+            context_message = json.loads(SafeJsonFormatter().format(record))[
+                "contextMessage"
+            ]
+        self.assertEqual(context_message["requestId"], SAFE_REQ_ID)

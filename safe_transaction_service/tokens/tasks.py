@@ -78,12 +78,13 @@ def _parse_token_address_from_token_list(
 @app.shared_task()
 def update_token_info_from_token_list_task() -> int:
     """
-    If there's at least one valid token list with at least 1 token, every token in the DB is marked as `not trusted`
-    and then every token on the list is marked as `trusted`.
+    If there's at least one valid token list with at least 1 token, every token in the DB is marked as
+    `not trusted` and then every token on the list is marked as `trusted`. Tokens with `trusted_admin` are
+    excluded from that reset, so manual curation is not wiped by this task.
 
     `logoURI` is also stored for the tokens with logos
 
-    :return: Number of tokens marked as `trusted`
+    :return: Number of tokens found on the token lists
     """
     tokens: list[TokenListToken] = []
     for token_list in TokenList.objects.all():
@@ -106,7 +107,8 @@ def update_token_info_from_token_list_task() -> int:
 
     tokens_updated_count = 0
     with transaction.atomic():
-        Token.objects.update(trusted=False)
+        # Filtering by `trusted` avoids rewriting rows that are already not trusted
+        Token.objects.filter(trusted=True, trusted_admin=False).update(trusted=False)
         for token in filtered_tokens:
             if token_address := _parse_token_address_from_token_list(token["address"]):
                 update_fields = {"trusted": True}

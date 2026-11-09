@@ -440,7 +440,9 @@ class TestSignals(SafeTestCaseMixin, TestCase):
         send_events_mock.assert_called_with([deleted_multisig_transaction_payload])
 
     @factory.django.mute_signals(post_save)
-    @mock.patch("safe_transaction_service.history.signals.get_queue_service")
+    @mock.patch(
+        "safe_transaction_service.history.services.event_service.get_queue_service"
+    )
     def test_queue_service_not_resolved_without_payloads(
         self, get_queue_service_mock: MagicMock
     ):

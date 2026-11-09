@@ -2,7 +2,7 @@
 import logging
 import socket
 from functools import cache
-from typing import Any
+from typing import Any, NamedTuple
 
 from django.conf import settings
 from django.db import transaction
@@ -14,6 +14,11 @@ from kombu.connection import ConnectionPool
 from kombu.pools import ProducerPool, get_limit
 from kombu.utils.functional import lazy
 
+from safe_transaction_service.utils.request_context import (
+    SAFE_REQ_ID_HEADER,
+    get_safe_req_id,
+)
+
 logger = logging.getLogger(__name__)
 
 # AMQP `app_id` set on every published event. Other services publish events
@@ -23,6 +28,16 @@ EVENTS_APP_ID = "safe-transaction-service"
 
 # A broker that does not answer must not block the process exit
 CLOSE_TIMEOUT_SECONDS = 5
+
+
+class SerializedEvent(NamedTuple):
+    """
+    Serialized event ready to publish, also kept in the unsent buffer
+    """
+
+    body: bytes
+    routing_key: str
+    safe_req_id: str | None
 
 
 class BaseQueueService:
@@ -97,7 +112,7 @@ class QueueService(BaseQueueService):
         self.producer_pool: ProducerPool = ProducerPool(
             self.connection_pool, limit=limit
         )
-        self.unsent_events: list[tuple[bytes, str]] = []
+        self.unsent_events: list[SerializedEvent] = []
 
     def _open_connections(self) -> list[Connection]:
         pool = self.connection_pool
@@ -142,22 +157,27 @@ class QueueService(BaseQueueService):
         """
         logger.warning("Broker error, retrying in %ss: %r", interval, exc)
 
-    def _try_publish(self, producer: Producer, event: bytes, routing_key: str) -> bool:
+    def _try_publish(self, producer: Producer, event: SerializedEvent) -> bool:
         """
         Attempt to publish one pre-serialized JSON event with the given
         producer. Returns True on success, never raises.
         """
         try:
             producer.publish(
-                event,
+                event.body,
                 exchange=self.exchange,
                 # Cached per connection by kombu, declared again when `retry`
                 # reconnects, also in the middle of a batch
                 declare=[self.exchange],
-                routing_key=routing_key,
+                routing_key=event.routing_key,
                 content_type="application/json",
                 content_encoding="utf-8",
                 app_id=EVENTS_APP_ID,
+                headers=(
+                    {SAFE_REQ_ID_HEADER: event.safe_req_id}
+                    if event.safe_req_id
+                    else None
+                ),
                 retry=True,
                 retry_policy={
                     "max_retries": 1,
@@ -166,25 +186,30 @@ class QueueService(BaseQueueService):
                 },
                 serializer="raw",
             )
-            logger.debug("Event sent with routing_key=%s: %s", routing_key, event)
+            logger.debug(
+                "Event sent with routing_key=%s safe_req_id=%s: %s",
+                event.routing_key,
+                event.safe_req_id,
+                event.body,
+            )
             return True
         except Exception as exc:
             logger.warning("Failed to publish event: %s", exc)
             return False
 
-    def _publish_events(self, events: list[tuple[bytes, str]]) -> int:
+    def _publish_events(self, events: list[SerializedEvent]) -> int:
         """
         Publish pre-serialized events in order, acquiring a producer from the
         pool only once. Stops on the first failure, never raises.
 
-        :param events: List of ``(serialized_event, routing_key)`` tuples
+        :param events: Events to publish
         :return: Number of events published
         """
         total = 0
         try:
             with self.producer_pool.acquire(block=False) as producer:
-                for event, routing_key in events:
-                    if not self._try_publish(producer, event, routing_key):
+                for event in events:
+                    if not self._try_publish(producer, event):
                         break
                     total += 1
         except Exception as exc:
@@ -201,12 +226,22 @@ class QueueService(BaseQueueService):
         are buffered, preserving order. On full success, also flush any
         previously buffered events.
 
+        Events carry the ``x-safe-req-id`` of the request being served, if any.
+        Buffered events keep their own when flushed later.
+
         :return: number of events published (payloads + any flushed unsent)
         """
-        events: list[tuple[bytes, str]] = []
+        safe_req_id = get_safe_req_id()
+        events: list[SerializedEvent] = []
         for payload in payloads:
             try:
-                events.append((orjson.dumps(payload), self._build_routing_key(payload)))
+                events.append(
+                    SerializedEvent(
+                        orjson.dumps(payload),
+                        self._build_routing_key(payload),
+                        safe_req_id,
+                    )
+                )
             except Exception:
                 logger.error("Cannot serialize payload %s", payload, exc_info=True)
         if not events:
@@ -217,7 +252,7 @@ class QueueService(BaseQueueService):
             logger.debug(
                 "Adding %d events to unsent messages, routing keys: %s",
                 len(unsent),
-                [routing_key for _, routing_key in unsent],
+                [event.routing_key for event in unsent],
             )
             self.unsent_events.extend(unsent)
             return total

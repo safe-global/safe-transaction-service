@@ -10,6 +10,8 @@ from kombu import Connection, Exchange, Queue
 from kombu.exceptions import LimitExceeded
 from kombu.pools import get_limit
 
+from ...utils.request_context import SAFE_REQ_ID_HEADER, safe_req_id_context
+from ...utils.tests.constants import SAFE_REQ_ID
 from ..services import queue_service as queue_service_module
 from ..services.queue_service import (
     EVENTS_APP_ID,
@@ -17,6 +19,8 @@ from ..services.queue_service import (
     close_queue_service,
     get_queue_service,
 )
+
+OTHER_SAFE_REQ_ID = "fedcba9876543210fedcba9876543210"
 
 
 class TestQueueService(TestCase):
@@ -40,11 +44,13 @@ class TestQueueService(TestCase):
     def tearDown(self):
         self.conn.close()
 
-    def _get_message(self):
+    def _get_raw_message(self):
         with self.conn.channel() as channel:
-            msg = self.test_queue(channel).get(no_ack=True)
-            if msg:
-                return json.loads(msg.body)
+            return self.test_queue(channel).get(no_ack=True)
+
+    def _get_message(self):
+        if msg := self._get_raw_message():
+            return json.loads(msg.body)
         return None
 
     def test_send_event_to_queue(self):
@@ -180,6 +186,45 @@ class TestQueueService(TestCase):
         with self.captureOnCommitCallbacks() as callbacks:
             queue_service.send_events_on_commit([])
         self.assertEqual(callbacks, [])
+
+    def test_send_events_sets_safe_req_id(self):
+        """Events published during a request carry its id as an AMQP header"""
+        queue_service = QueueService()
+        self.enterContext(safe_req_id_context(SAFE_REQ_ID))
+        payloads = [{"message": f"event {i}"} for i in range(2)]
+        self.assertEqual(queue_service.send_events(payloads), 2)
+        for payload in payloads:
+            msg = self._get_raw_message()
+            self.assertEqual(json.loads(msg.body), payload)
+            self.assertEqual(msg.headers, {SAFE_REQ_ID_HEADER: SAFE_REQ_ID})
+            self.assertEqual(msg.properties["app_id"], EVENTS_APP_ID)
+
+    def test_send_events_without_safe_req_id(self):
+        """Events published outside a request (Celery tasks, indexers) have no header"""
+        queue_service = QueueService()
+        queue_service.send_events([{"message": "no request"}])
+        self.assertNotIn(SAFE_REQ_ID_HEADER, self._get_raw_message().headers)
+
+    def test_buffered_event_keeps_its_safe_req_id(self):
+        """A buffered event keeps its own id when flushed during another request"""
+        queue_service = QueueService()
+        queue_service.clear_unsent_events()
+        with (
+            safe_req_id_context(SAFE_REQ_ID),
+            mock.patch.object(QueueService, "_try_publish", return_value=False),
+        ):
+            queue_service.send_events([{"message": "buffered"}])
+        self.assertEqual(len(queue_service.unsent_events), 1)
+
+        # Flushed while serving another request
+        with safe_req_id_context(OTHER_SAFE_REQ_ID):
+            queue_service.send_events([{"message": "recovered"}])
+        recovered = self._get_raw_message()
+        self.assertEqual(json.loads(recovered.body), {"message": "recovered"})
+        self.assertEqual(recovered.headers[SAFE_REQ_ID_HEADER], OTHER_SAFE_REQ_ID)
+        buffered = self._get_raw_message()
+        self.assertEqual(json.loads(buffered.body), {"message": "buffered"})
+        self.assertEqual(buffered.headers[SAFE_REQ_ID_HEADER], SAFE_REQ_ID)
 
     def _make_queue_service(self) -> QueueService:
         queue_service = QueueService()
