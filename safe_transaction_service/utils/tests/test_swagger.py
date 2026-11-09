@@ -106,6 +106,27 @@ class TestSchemaView(TestCase):
         ]
         self.assertEqual(protected, [])
 
+    @override_settings(SCHEMA_SERVER_URL="https://api.example.com")
+    def test_schema_conventional_alias(self):
+        """`openapi.json` serves the same JSON schema as `schema/`, also behind the proxy"""
+        for prefix in ("", PREFIX):
+            with self.subTest(prefix=prefix):
+                schema = self.get_schema(prefix=prefix)
+                headers = {"X-Forwarded-Prefix": prefix} if prefix else {}
+                response = self.client.get(
+                    reverse("schema-openapi-json"), headers=headers
+                )
+                clear_script_prefix()
+                self.assertEqual(response.status_code, status.HTTP_200_OK)
+                self.assertEqual(
+                    response["Content-Type"], "application/vnd.oai.openapi+json"
+                )
+                self.assertEqual(response.json(), schema)
+                if prefix:
+                    self.assertTrue(
+                        all(path.startswith(prefix) for path in schema["paths"])
+                    )
+
     def test_schema_excludes_analytics(self):
         """The admin-only analytics endpoint is not in the public schema"""
         paths = self.get_schema()["paths"]

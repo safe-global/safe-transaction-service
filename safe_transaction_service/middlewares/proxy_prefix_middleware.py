@@ -2,7 +2,7 @@
 import logging
 
 from django.http import HttpRequest
-from django.urls import set_script_prefix
+from django.urls import reverse, set_script_prefix
 
 
 class ProxyPrefixMiddleware:
@@ -45,4 +45,7 @@ class ProxyPrefixMiddleware:
 
             request.build_absolute_uri = patched_build_absolute_uri
 
-        return self.get_response(request)
+        response = self.get_response(request)
+        # RFC 8631: lets callers that never saw llms.txt find the OpenAPI document
+        response["Link"] = f'<{reverse("schema-openapi-json")}>; rel="service-desc"'
+        return response

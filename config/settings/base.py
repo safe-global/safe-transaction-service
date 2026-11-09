@@ -218,7 +218,7 @@ CORS_ALLOW_HEADERS = list(default_cors_headers) + [
     "if-modified-since",
     "if-none-match",
 ]
-CORS_EXPOSE_HEADERS = ["etag"]
+CORS_EXPOSE_HEADERS = ["etag", "Link"]
 
 
 # FIXTURES

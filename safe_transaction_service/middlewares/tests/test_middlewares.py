@@ -3,8 +3,9 @@ import logging
 import unittest
 from unittest.mock import MagicMock
 
+from django.http import HttpResponse
 from django.test import RequestFactory, TestCase
-from django.urls import reverse
+from django.urls import clear_script_prefix, reverse
 
 from ...utils.request_context import SAFE_REQ_ID_HEADER, get_safe_req_id
 from ...utils.tests.constants import SAFE_REQ_ID
@@ -14,17 +15,20 @@ from ..safe_request_id_middleware import SafeRequestIdMiddleware
 
 class TestMiddlewares(unittest.TestCase):
     def test_proxy_prefix_middleware(self):
+        clear_script_prefix()
         request_factory = RequestFactory()
-        get_response = MagicMock(return_value="middleware_response")
+        middleware_response = HttpResponse()
+        get_response = MagicMock(return_value=middleware_response)
         request = request_factory.get("/test/path")
 
         middleware = ProxyPrefixMiddleware(get_response)
         response = middleware(request)
 
         get_response.assert_called_once_with(request)
-        self.assertEqual(response, "middleware_response")
+        self.assertEqual(response, middleware_response)
         self.assertEqual(request.build_absolute_uri(), "http://testserver/test/path")
         self.assertEqual(request.get_full_path(), "/test/path")
+        self.assertEqual(response["Link"], '</openapi.json>; rel="service-desc"')
 
         get_response.reset_mock()
         prefix = "/prefix"
@@ -36,11 +40,12 @@ class TestMiddlewares(unittest.TestCase):
         response = middleware(request)
 
         get_response.assert_called_once_with(request)
-        self.assertEqual(response, "middleware_response")
+        self.assertEqual(response, middleware_response)
         self.assertEqual(
             request.build_absolute_uri(), "http://testserver/prefix/test/path"
         )
         self.assertEqual(request.get_full_path(), "/prefix/test/path")
+        self.assertEqual(response["Link"], '</prefix/openapi.json>; rel="service-desc"')
 
     def test_safe_request_id_middleware(self):
         """The header is set while serving the request and cleared after"""
