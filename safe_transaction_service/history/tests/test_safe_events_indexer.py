@@ -18,7 +18,6 @@ from safe_eth.safe import Safe
 from safe_eth.safe.tests.safe_test_case import SafeTestCaseMixin
 from safe_eth.util.util import to_0x_hex_str
 from web3 import Web3
-from web3.auto import w3
 from web3.datastructures import AttributeDict
 from web3.types import LogReceipt
 
@@ -222,6 +221,7 @@ class SafeEventsIndexerBaseAbstractTestBase(SafeTestCaseMixin, TestCase, ABC):
             self.safe_contract.address,
             initializer=initializer,
         )
+        self.wait_for_receipt(ethereum_tx_sent.tx_hash)
         safe_address = ethereum_tx_sent.contract_address
         safe = Safe(safe_address, self.ethereum_client)
         safe_contract = self.get_safe_contract(self.w3, safe_address)
@@ -274,7 +274,8 @@ class SafeEventsIndexerBaseAbstractTestBase(SafeTestCaseMixin, TestCase, ABC):
 
         multisig_tx = safe.build_multisig_tx(safe_address, 0, data)
         multisig_tx.sign(owner_account_1.key)
-        multisig_tx.execute(self.ethereum_test_account.key)
+        tx_hash, _ = multisig_tx.execute(self.ethereum_test_account.key)
+        self.wait_for_receipt(tx_hash)
         # Process events: SafeMultiSigTransaction, AddedOwner, ExecutionSuccess
         self.assertEqual(self.safe_events_indexer.start(), (3, 1))
         self.assertEqual(InternalTx.objects.count(), 5)
@@ -315,7 +316,8 @@ class SafeEventsIndexerBaseAbstractTestBase(SafeTestCaseMixin, TestCase, ABC):
 
         multisig_tx = safe.build_multisig_tx(safe_address, 0, data)
         multisig_tx.sign(owner_account_1.key)
-        multisig_tx.execute(self.ethereum_test_account.key)
+        tx_hash, _ = multisig_tx.execute(self.ethereum_test_account.key)
+        self.wait_for_receipt(tx_hash)
         # Process events: SafeMultiSigTransaction, ChangedThreshold, ExecutionSuccess
         self.assertEqual(self.safe_events_indexer.start(), (3, 1))
         self.safe_tx_processor.process_decoded_transactions(
@@ -354,7 +356,8 @@ class SafeEventsIndexerBaseAbstractTestBase(SafeTestCaseMixin, TestCase, ABC):
         multisig_tx = safe.build_multisig_tx(safe_address, 0, data)
         multisig_tx.sign(owner_account_1.key)
         multisig_tx.sign(owner_account_2.key)
-        multisig_tx.execute(self.ethereum_test_account.key)
+        tx_hash, _ = multisig_tx.execute(self.ethereum_test_account.key)
+        self.wait_for_receipt(tx_hash)
         # Process events: SafeMultiSigTransaction, RemovedOwner, ChangedThreshold, ExecutionSuccess
         self.assertEqual(self.safe_events_indexer.start(), (4, 1))
         self.safe_tx_processor.process_decoded_transactions(
@@ -404,7 +407,8 @@ class SafeEventsIndexerBaseAbstractTestBase(SafeTestCaseMixin, TestCase, ABC):
 
         multisig_tx = safe.build_multisig_tx(safe_address, 0, data)
         multisig_tx.sign(owner_account_1.key)
-        multisig_tx.execute(self.ethereum_test_account.key)
+        tx_hash, _ = multisig_tx.execute(self.ethereum_test_account.key)
+        self.wait_for_receipt(tx_hash)
         # Process events: SafeMultiSigTransaction, EnabledModule, ExecutionSuccess
         self.assertEqual(self.safe_events_indexer.start(), (3, 1))
         self.safe_tx_processor.process_decoded_transactions(
@@ -462,7 +466,8 @@ class SafeEventsIndexerBaseAbstractTestBase(SafeTestCaseMixin, TestCase, ABC):
 
         multisig_tx = safe.build_multisig_tx(safe_address, 0, data)
         multisig_tx.sign(owner_account_1.key)
-        multisig_tx.execute(self.ethereum_test_account.key)
+        tx_hash, _ = multisig_tx.execute(self.ethereum_test_account.key)
+        self.wait_for_receipt(tx_hash)
         # Process events: SafeMultiSigTransaction, ChangedFallbackHandler, ExecutionSuccess
         self.assertEqual(self.safe_events_indexer.start(), (3, 1))
         self.safe_tx_processor.process_decoded_transactions(
@@ -502,7 +507,8 @@ class SafeEventsIndexerBaseAbstractTestBase(SafeTestCaseMixin, TestCase, ABC):
 
         multisig_tx = safe.build_multisig_tx(safe_address, 0, data)
         multisig_tx.sign(owner_account_1.key)
-        multisig_tx.execute(self.ethereum_test_account.key)
+        tx_hash, _ = multisig_tx.execute(self.ethereum_test_account.key)
+        self.wait_for_receipt(tx_hash)
         # Process events: SafeMultiSigTransaction, DisabledModule, ExecutionSuccess
         self.assertEqual(self.safe_events_indexer.start(), (3, 1))
         self.safe_tx_processor.process_decoded_transactions(
@@ -541,8 +547,7 @@ class SafeEventsIndexerBaseAbstractTestBase(SafeTestCaseMixin, TestCase, ABC):
                 ),
             }
         )
-        tx = owner_account_1.sign_transaction(tx)
-        self.w3.eth.send_raw_transaction(tx["raw_transaction"])
+        self.send_tx(tx, owner_account_1)
         # Process events: ApproveHash
         self.assertEqual(self.safe_events_indexer.start(), (1, 1))
         self.safe_tx_processor.process_decoded_transactions(
@@ -569,7 +574,8 @@ class SafeEventsIndexerBaseAbstractTestBase(SafeTestCaseMixin, TestCase, ABC):
         to = Account.create().address
         multisig_tx = safe.build_multisig_tx(to, value, data)
         multisig_tx.sign(owner_account_1.key)
-        multisig_tx.execute(self.ethereum_test_account.key)
+        tx_hash, _ = multisig_tx.execute(self.ethereum_test_account.key)
+        self.wait_for_receipt(tx_hash)
         # Process events: SafeMultiSigTransaction, ExecutionSuccess
         self.assertEqual(self.safe_events_indexer.start(), (3, 1))
         self.safe_tx_processor.process_decoded_transactions(
@@ -604,7 +610,8 @@ class SafeEventsIndexerBaseAbstractTestBase(SafeTestCaseMixin, TestCase, ABC):
 
         multisig_tx = safe.build_multisig_tx(safe_address, 0, data)
         multisig_tx.sign(owner_account_1.key)
-        multisig_tx.execute(self.ethereum_test_account.key)
+        tx_hash, _ = multisig_tx.execute(self.ethereum_test_account.key)
+        self.wait_for_receipt(tx_hash)
         # Process events: SafeMultiSigTransaction, ChangedGuard, ExecutionSuccess
         # 2 blocks will be processed due to the guard deployment
         self.assertEqual(self.safe_events_indexer.start(), (3, 2))
@@ -722,6 +729,7 @@ class SafeEventsIndexerBaseAbstractTestBase(SafeTestCaseMixin, TestCase, ABC):
             self.safe_contract.address,
             initializer=initializer,
         )
+        self.wait_for_receipt(ethereum_tx_sent.tx_hash)
         safe_address = ethereum_tx_sent.contract_address
         safe_contract = self.get_safe_contract(self.w3, safe_address)
         self.assertEqual(
@@ -852,6 +860,7 @@ class SafeEventsIndexerBaseAbstractTestBase(SafeTestCaseMixin, TestCase, ABC):
             self.safe_contract.address,
             initializer=b"",
         )
+        self.wait_for_receipt(ethereum_tx_sent.tx_hash)
         safe_address = ethereum_tx_sent.contract_address
         self.assertEqual(InternalTx.objects.count(), 0)
         self.assertEqual(InternalTxDecoded.objects.count(), 0)
@@ -887,8 +896,7 @@ class SafeEventsIndexerBaseAbstractTestBase(SafeTestCaseMixin, TestCase, ABC):
         ).build_transaction(
             {"nonce": self.w3.eth.get_transaction_count(owner_account_1.address)}
         )
-        signed_tx = owner_account_1.sign_transaction(setup_call)
-        w3.eth.send_raw_transaction(signed_tx.raw_transaction)
+        self.send_tx(setup_call, owner_account_1)
         self.assertEqual(self.safe_events_indexer.start(), (1, 1))
         # We remove the proxyCreation internaltx
         self.assertEqual(InternalTx.objects.count(), 1)
@@ -901,6 +909,7 @@ class SafeEventsIndexerBaseAbstractTestBase(SafeTestCaseMixin, TestCase, ABC):
             self.safe_contract.address,
             initializer=b"",
         )
+        self.wait_for_receipt(ethereum_tx_sent.tx_hash)
         safe_address = ethereum_tx_sent.contract_address
         deployed_safe_contract = self.get_safe_contract(self.w3, safe_address)
         setup_call = deployed_safe_contract.functions.setup(
@@ -915,8 +924,7 @@ class SafeEventsIndexerBaseAbstractTestBase(SafeTestCaseMixin, TestCase, ABC):
         ).build_transaction(
             {"nonce": self.w3.eth.get_transaction_count(owner_account_1.address)}
         )
-        signed_tx = owner_account_1.sign_transaction(setup_call)
-        w3.eth.send_raw_transaction(signed_tx.raw_transaction)
+        self.send_tx(setup_call, owner_account_1)
         self.assertEqual(self.safe_events_indexer.start(), (2, 2))
         # Proxy creation InternalTx must contain the Safe address
         self.assertEqual(
@@ -1576,6 +1584,7 @@ class TestSafeEventsIndexerV1_5_0(SafeEventsIndexerBaseAbstractTestBase):
             self.safe_contract.address,
             initializer=initializer,
         )
+        self.wait_for_receipt(ethereum_tx_sent.tx_hash)
         safe_address = ethereum_tx_sent.contract_address
         safe = Safe(safe_address, self.ethereum_client)
         self.assertEqual(self.safe_events_indexer.start(), (2, 1))
@@ -1590,7 +1599,8 @@ class TestSafeEventsIndexerV1_5_0(SafeEventsIndexerBaseAbstractTestBase):
 
         multisig_tx = safe.build_multisig_tx(safe_address, 0, data)
         multisig_tx.sign(owner_account_1.key)
-        multisig_tx.execute(self.ethereum_test_account.key)
+        tx_hash, _ = multisig_tx.execute(self.ethereum_test_account.key)
+        self.wait_for_receipt(tx_hash)
         # Process events: SafeMultiSigTransaction, ChangedModuleGuard, ExecutionSuccess
         # 2 blocks will be processed due to the module guard deployment
         self.assertEqual(self.safe_events_indexer.start(), (3, 2))

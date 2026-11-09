@@ -753,7 +753,7 @@ class TestCommands(SafeTestCaseMixin, TestCase):
     @mock.patch(
         "safe_transaction_service.history.management.commands.check_index_problems.settings.ETH_L2_NETWORK",
         return_value=True,
-    )  # Testing L2 chain as ganache haven't tracing methods
+    )
     def test_check_index_problems(self, mock_eth_l2_network: MagicMock):
         command = "check_index_problems"
         buf = StringIO()
@@ -782,6 +782,7 @@ class TestCommands(SafeTestCaseMixin, TestCase):
         multisig_tx = safe.build_multisig_tx(to, value, data)
         multisig_tx.sign(owner.key)
         tx_hash, _ = multisig_tx.execute(self.ethereum_test_account.key)
+        self.wait_for_receipt(tx_hash)
         SafeLastStatus.objects.filter(address=safe.address).update(nonce=1)
         self.assertEqual(InternalTxDecoded.objects.count(), 0)
         buf = StringIO()
