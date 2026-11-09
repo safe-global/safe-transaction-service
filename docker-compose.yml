@@ -96,7 +96,9 @@ services:
     healthcheck:
       test: ["CMD", "cast", "block-number"]
       interval: 1s
+      timeout: 5s
       retries: 10
+      start_period: 5s
     profiles:
       - develop
 
