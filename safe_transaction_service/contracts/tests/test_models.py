@@ -1,22 +1,15 @@
 # SPDX-License-Identifier: FSL-1.1-MIT
 import json
-from unittest import mock
 
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError
-from django.db.models.fields.files import ImageFieldFile
 from django.db.transaction import atomic
 from django.test import TestCase
 
-from eth_account import Account
 from safe_eth.eth.tests.clients.mocks import sourcify_safe_metadata
 
-from ..models import Contract, ContractAbi, validate_abi
+from ..models import Contract, ContractAbi, get_contract_logo_path, validate_abi
 from .factories import ContractAbiFactory, ContractFactory
-from .mocks.contract_metadata_mocks import (
-    blockscout_metadata_mock,
-    sourcify_metadata_mock,
-)
 
 
 class TestContractAbi(TestCase):
@@ -49,106 +42,20 @@ class TestContractAbi(TestCase):
 
 
 class TestContract(TestCase):
-    def test_contract_create_from_metadata(self):
-        safe_contract_address = "0x6851D6fDFAfD08c0295C392436245E5bc78B0185"
-        contract = Contract.objects.create_from_metadata(
-            safe_contract_address, sourcify_metadata_mock
-        )
-        self.assertEqual(contract.name, "Sourcify Uxio Contract")
-        self.assertTrue(contract.contract_abi.abi)
-        self.assertEqual(len(contract.contract_abi.abi_functions()), 2)
-
-        with self.assertRaises(IntegrityError):
-            with atomic():
-                Contract.objects.create_from_metadata(
-                    safe_contract_address, sourcify_metadata_mock
-                )
-
-        with self.assertRaises(IntegrityError):
-            with atomic():
-                Contract.objects.create_from_metadata(
-                    safe_contract_address, blockscout_metadata_mock
-                )
-
-        contract.delete()
-        contract = Contract.objects.create_from_metadata(
-            safe_contract_address, blockscout_metadata_mock
-        )
-        self.assertEqual(contract.name, "Blockscout Moises Contract")
-        self.assertTrue(contract.contract_abi.abi)
-        self.assertEqual(len(contract.contract_abi.abi_functions()), 2)
-
-        contract_metadata = None
-        new_safe_contract_address = Account.create().address
-        contract_without_metadata = Contract.objects.create_from_metadata(
-            new_safe_contract_address, contract_metadata
-        )
-        self.assertEqual(contract_without_metadata.name, "")
-        self.assertIsNone(contract_without_metadata.contract_abi)
-
-    def test_fix_missing_logos(self):
-        self.assertEqual(Contract.objects.fix_missing_logos(), 0)
-        contract_name = "test-contract"
-        contract_display_name = "awesome-contract"
-        contract = ContractFactory(logo="", name=contract_name, display_name="")
-        contract.display_name = contract_display_name
-        contract.save()
+    def test_with_logo_without_logo(self):
+        """
+        Contracts are split between `with_logo` and `without_logo` by the logo field
+        """
+        contract = ContractFactory(logo="")
         self.assertIn("without logo", str(contract))
         self.assertEqual(Contract.objects.with_logo().count(), 0)
         self.assertEqual(Contract.objects.without_logo().count(), 1)
-        self.assertEqual(contract.logo, "")
-        self.assertEqual(Contract.objects.fix_missing_logos(), 0)
-        with mock.patch.object(ImageFieldFile, "size", return_value=1):
-            self.assertEqual(Contract.objects.fix_missing_logos(), 1)
 
-        contract.refresh_from_db()
+        contract.logo.name = get_contract_logo_path(contract, "logo.png")
+        contract.save(update_fields=["logo"])
         self.assertIn("with logo", str(contract))
-        self.assertIn(f"{contract.address}.png", contract.logo.name)
         self.assertEqual(Contract.objects.with_logo().count(), 1)
         self.assertEqual(Contract.objects.without_logo().count(), 0)
-
-    def test_update_from_metadata(self):
-        contract_name = "Hello"
-        contract = Contract.objects.create(
-            address="0xaE32496491b53841efb51829d6f886387708F99B",
-            name=contract_name,
-            contract_abi=None,
-        )
-        self.assertIsNone(contract.contract_abi)
-        self.assertEqual(ContractAbi.objects.count(), 0)
-        self.assertTrue(contract.update_from_metadata(sourcify_metadata_mock))
-        # Remove contract_abi description and sync again to check that's filled
-        contract.contract_abi.description = ""
-        contract.contract_abi.save()
-        self.assertTrue(contract.update_from_metadata(sourcify_metadata_mock))
-        self.assertIsNotNone(contract.contract_abi)
-        self.assertEqual(contract.name, contract_name)
-        contract_abi = contract.contract_abi
-        self.assertEqual(
-            contract_abi.description,
-            sourcify_metadata_mock.name,
-        )
-        self.assertEqual(contract_abi.abi, sourcify_metadata_mock.abi)
-
-        self.assertTrue(contract.update_from_metadata(blockscout_metadata_mock))
-        self.assertEqual(ContractAbi.objects.count(), 2)  # A new ABI was inserted
-        self.assertNotEqual(
-            contract.contract_abi, contract_abi
-        )  # Contract_abi was changed
-        contract_abi.refresh_from_db()
-        self.assertEqual(
-            contract_abi.description,
-            sourcify_metadata_mock.name,
-        )  # Description should not change
-
-        self.assertFalse(contract.update_from_metadata(None))
-
-    def test_without_metadata(self):
-        ContractFactory(name="aloha", contract_abi=None)
-        ContractFactory(name="")
-        self.assertEqual(Contract.objects.without_metadata().count(), 2)
-        ContractFactory()
-        self.assertEqual(Contract.objects.without_metadata().count(), 2)
 
     def test_validate_abi(self):
         with self.assertRaises(ValidationError):

@@ -146,11 +146,6 @@ def is_db_tx_decoder_loaded() -> bool:
 
 
 @cache
-def get_tx_decoder() -> "TxDecoder":
-    return TxDecoder()
-
-
-@cache
 def get_safe_tx_decoder() -> "SafeTxDecoder":
     return SafeTxDecoder()
 

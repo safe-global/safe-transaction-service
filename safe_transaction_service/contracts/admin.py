@@ -42,7 +42,6 @@ class HasAbiFilter(admin.SimpleListFilter):
 
 @admin.register(Contract)
 class ContractAdmin(AdvancedAdminSearchMixin, admin.ModelAdmin):
-    actions = ["find_abi"]
     list_display = (
         "address",
         "name",

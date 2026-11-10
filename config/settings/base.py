@@ -320,10 +320,6 @@ CELERY_TASK_ROUTES = (
             {"queue": "indexing", "delivery_mode": "transient"},
         ),
         (
-            "safe_transaction_service.contracts.tasks.*",
-            {"queue": "contracts", "delivery_mode": "transient"},
-        ),
-        (
             "safe_transaction_service.tokens.tasks.*",
             {"queue": "tokens", "delivery_mode": "transient"},
         ),
@@ -767,18 +763,6 @@ CACHE_ALL_TXS_COMPRESSION_LEVEL = env.int("CACHE_ALL_TXS_COMPRESSION_LEVEL", def
 CACHE_VIEW_DEFAULT_TIMEOUT = env.int(
     "CACHE_VIEW_DEFAULT_TIMEOUT", default=0
 )  # 0 will disable the cache
-
-# Contracts reindex batch configuration
-# ------------------------------------------------------------------------------
-# The following configuration prevents overwhelming third-party data sources by controlling the rate of requests.
-# Defines the batch size to limit the number of reindex contracts tasks sent to Celery concurrently.
-REINDEX_CONTRACTS_METADATA_BATCH = env.int(
-    "REINDEX_CONTRACTS_METADATA_BATCH", default=100
-)
-# Defines the delay countdown between batches of reindex contract tasks.
-REINDEX_CONTRACTS_METADATA_COUNTDOWN = env.int(
-    "REINDEX_CONTRACTS_METADATA_COUNTDOWN", default=0
-)
 
 # DRF ESPECTACULAR
 SCHEMA_SERVER_URL = env("SCHEMA_SERVER_URL", default=None)
