@@ -2,7 +2,6 @@
 import json
 import operator
 import os
-from logging import getLogger
 from typing import Any
 
 from django.conf import settings
@@ -12,16 +11,12 @@ from django.db import models
 from django.db.models import JSONField, Q
 from django.utils.translation import gettext_lazy as _
 
-from botocore.exceptions import ClientError
 from cachetools import TTLCache, cachedmethod
 from imagekit.models import ProcessedImageField
 from pilkit.processors import Resize
-from safe_eth.eth.clients import ContractMetadata
 from safe_eth.eth.django.models import EthereumAddressBinaryField, Keccak256Field
 from safe_eth.eth.utils import fast_keccak
 from web3._utils.normalizers import normalize_abi
-
-logger = getLogger(__name__)
 
 
 def get_contract_logo_path(instance: "Contract", filename):
@@ -89,42 +84,6 @@ class ContractAbi(models.Model):
         return super().save(*args, **kwargs)
 
 
-class ContractManager(models.Manager):
-    def create_from_metadata(
-        self, address: str, metadata: ContractMetadata | None
-    ) -> "Contract":
-        """
-        Create contract from provided ``metadata``
-
-        :param address:
-        :param metadata:
-        :return: Contract instance populated with all the information provided by ``metadata``
-        """
-        contract = super().create(address=address)
-        if metadata:
-            contract.update_from_metadata(metadata)
-        return contract
-
-    def fix_missing_logos(self) -> int:
-        """
-        Syncs contracts with empty logos with files that exist on S3 and match the address
-
-        :return: Number of synced logos
-        """
-        synced_logos = 0
-        for contract in self.without_logo():
-            filename = get_contract_logo_path(contract, f"{contract.address}.png")
-            contract.logo.name = filename
-            try:
-                if contract.logo.size:
-                    synced_logos += 1
-                    contract.save(update_fields=["logo"])
-                    logger.info("Found logo on url %s", contract.logo.url)
-            except (ClientError, FileNotFoundError):  # Depending on aws or filesystem
-                logger.error("Error retrieving url %s", contract.logo.url)
-        return synced_logos
-
-
 class ContractQuerySet(models.QuerySet):
     cache_trusted_addresses_for_delegate_call = TTLCache(
         maxsize=2048, ttl=60 * 5
@@ -136,9 +95,6 @@ class ContractQuerySet(models.QuerySet):
 
     def without_logo(self):
         return self.filter(self.no_logo_query)
-
-    def without_metadata(self):
-        return self.filter(Q(contract_abi=None) | Q(name=""))
 
     def trusted_for_delegate_call(self):
         return self.filter(trusted_for_delegate_call=True)
@@ -156,7 +112,7 @@ class ContractQuerySet(models.QuerySet):
 class Contract(models.Model):
     """Tracks known contract addresses with optional ABI and branding metadata."""
 
-    objects = ContractManager.from_queryset(ContractQuerySet)()
+    objects = ContractQuerySet.as_manager()
     address = EthereumAddressBinaryField(primary_key=True)
     name = models.CharField(max_length=200, blank=True, default="")
     display_name = models.CharField(max_length=200, blank=True, default="")
@@ -183,28 +139,3 @@ class Contract(models.Model):
         has_abi = self.contract_abi_id is not None
         logo = " with logo" if self.logo else " without logo"
         return f"Contract {self.address} - {self.name} - with abi {has_abi}{logo}"
-
-    def update_from_metadata(self, contract_metadata: ContractMetadata) -> bool:
-        """
-        Update contract metadata
-
-        :param contract_metadata: Contract Metadata
-        :return: True if updated, False otherwise
-        """
-        if not contract_metadata:
-            return False
-
-        name = contract_metadata.name or ""
-        contract_abi, _ = ContractAbi.objects.get_or_create(
-            abi=contract_metadata.abi, defaults={"description": name}
-        )
-        if name:
-            if not contract_abi.description:
-                contract_abi.description = name
-                contract_abi.save(update_fields=["description"])
-            if not self.name:
-                self.name = name
-        self.contract_abi = contract_abi
-        self.save(update_fields=["name", "contract_abi"])
-
-        return bool(contract_abi)

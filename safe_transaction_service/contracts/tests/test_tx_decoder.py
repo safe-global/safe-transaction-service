@@ -22,7 +22,6 @@ from ..tx_decoder import (
     UnexpectedProblemDecoding,
     get_db_tx_decoder,
     get_safe_tx_decoder,
-    get_tx_decoder,
     is_db_tx_decoder_loaded,
 )
 from .mocks.tx_decoder_mocks import (
@@ -36,7 +35,6 @@ logger = logging.getLogger(__name__)
 
 class TestTxDecoder(TestCase):
     def test_singleton(self):
-        self.assertTrue(isinstance(get_tx_decoder(), TxDecoder))
         self.assertTrue(isinstance(get_safe_tx_decoder(), SafeTxDecoder))
         self.assertFalse(is_db_tx_decoder_loaded())
         self.assertTrue(isinstance(get_db_tx_decoder(), DbTxDecoder))
@@ -67,7 +65,7 @@ class TestTxDecoder(TestCase):
             type(arguments["baseGas"]), int
         )  # SafeTxDecoder does not change numbers
 
-        safe_tx_decoder = get_tx_decoder()
+        safe_tx_decoder = TxDecoder()
         function_name, arguments = safe_tx_decoder.decode_transaction(data)
         self.assertEqual(function_name, "execTransaction")
         self.assertIn("baseGas", arguments)
@@ -181,7 +179,7 @@ class TestTxDecoder(TestCase):
         change_fallback_manager_data = HexBytes(
             "0xf08a0323000000000000000000000000d5d82b6addc9027b22dca772aa68d5d74cdbdf44"
         )
-        tx_decoder = get_tx_decoder()
+        tx_decoder = TxDecoder()
         expected = [
             {
                 "operation": operation,
@@ -282,7 +280,7 @@ class TestTxDecoder(TestCase):
             "8a0323000000000000000000000000d5d82b6addc9027b22dca772aa68d5d74cdbdf440000000000000000000000"
             "000000"
         )
-        tx_decoder = get_tx_decoder()
+        tx_decoder = TxDecoder()
         self.assertEqual(tx_decoder.decode_multisend_data(data), [])
         self.assertEqual(
             tx_decoder.decode_transaction_with_types(data),
@@ -301,20 +299,20 @@ class TestTxDecoder(TestCase):
 
     def test_decode_safe_exec_transaction(self):
         data = exec_transaction_data_mock
-        tx_decoder = get_tx_decoder()
+        tx_decoder = TxDecoder()
         self.assertEqual(
             tx_decoder.get_data_decoded(data), exec_transaction_decoded_mock
         )
 
     def test_unexpected_problem_decoding(self):
         data = insufficient_data_bytes_mock
-        tx_decoder = get_tx_decoder()
+        tx_decoder = TxDecoder()
 
         with self.assertRaises(UnexpectedProblemDecoding):
             tx_decoder.decode_transaction(data)
 
     def test_supported_fn_selectors(self):
-        for tx_decoder in (TxDecoder(), get_tx_decoder(), get_safe_tx_decoder()):
+        for tx_decoder in (TxDecoder(), get_safe_tx_decoder()):
             self.assertIn(
                 b"jv\x12\x02", tx_decoder.fn_selectors_with_abis
             )  # execTransaction for Safe >= V1.0.0
