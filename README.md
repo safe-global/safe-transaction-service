@@ -15,12 +15,12 @@ as in previous versions of the *Transaction Service*.
 Transactions can also be sent to the service to allow offchain collecting of signatures or informing the owners about
 a transaction that is pending to be sent to the blockchain.
 
-[Swagger (Mainnet version)](https://safe-transaction-mainnet.safe.global/)
+[Swagger (Mainnet version)](https://api.safe.global/tx-service/eth/)
 [More networks](https://docs.safe.global/api-supported-networks)
 
 ## Index of contents
 
-- [Docs](https://docs.safe.global/safe-core-api/service-architecture)
+- [Docs](https://docs.safe.global/core-api/api-overview#architecture)
 - [Deploying the service](https://github.com/safe-global/safe-infrastructure)
 
 ## Setup for development
@@ -73,7 +73,7 @@ For more parameters check [base.py](config/settings/base.py) file.
 
 - If the network is not supported yet [contracts can be deployed using the deployment instructions
 ](https://github.com/safe-global/safe-contracts/tree/v1.3.0/contracts)
-and then a PR should be provided [adding the deployment block number and the address](https://github.com/safe-global/safe-eth-py/blob/main/gnosis/safe/addresses.py) (address will be the same for every network).
+and then a PR should be provided [adding the deployment block number and the address](https://github.com/safe-global/safe-eth-py/blob/main/safe_eth/safe/addresses.py) (address will be the same for every network).
 - Only `ProxyFactory` and `GnosisSafeL2` must be configured. `+L2` must be added to the `Safe L2` contract versions, so the service knows the contract can be indexed using events. For us to accept the PR network must be on https://github.com/ethereum-lists/chains .
 - You can always set this up later using the **admin panel** if your network is not supported, going to the **Master Copies** and **Proxy Factories**.
 - **We recommend** using event indexing for every network where transaction fees are not relevant, so a tracing node is not required and everything can be indexed using events with the `Safe L2` version.
@@ -143,6 +143,10 @@ docker exec -it safe-transaction-service-web-1 python manage.py createsuperuser
 ## Safe Contract ABIs and addresses
 - [v1.3.0](https://github.com/safe-global/safe-deployments/blob/main/src/assets/v1.3.0/gnosis_safe.json)
 - [v1.3.0 L2](https://github.com/safe-global/safe-deployments/blob/main/src/assets/v1.3.0/gnosis_safe_l2.json)
+- [v1.4.1](https://github.com/safe-global/safe-deployments/blob/main/src/assets/v1.4.1/safe.json)
+- [v1.4.1 L2](https://github.com/safe-global/safe-deployments/blob/main/src/assets/v1.4.1/safe_l2.json)
+- [v1.5.0](https://github.com/safe-global/safe-deployments/blob/main/src/assets/v1.5.0/safe.json)
+- [v1.5.0 L2](https://github.com/safe-global/safe-deployments/blob/main/src/assets/v1.5.0/safe_l2.json)
 - [Other related contracts and previous Safe versions](https://github.com/safe-global/safe-deployments/blob/main/src/assets)
 
 ### Load default Safe Contracts Metadata
@@ -160,7 +164,7 @@ Service can run into some issues when running in production:
 
 ### Indexing issues
 You can tell there are indexing issues if:
-- Executed transactions are missing from the API (`all-transactions`, `multisig-transactions`, `module-transactions`... endpoints). If you use the [Safe{Wallet} Web client](https://github.com/safe-global/safe-wallet-web) you should check what is the current state of the Safe Client Gateway cache as it might have outdated data.
+- Executed transactions are missing from the API (`all-transactions`, `multisig-transactions`, `module-transactions`... endpoints). If you use the [Safe{Wallet} Web client](https://github.com/safe-global/safe-wallet-monorepo) you should check what is the current state of the Safe Client Gateway cache as it might have outdated data.
 - Asset transfers (ERC20/721) are missing from `all-transactions` or `transfers` endpoints.
 - You see error logs such as "Cannot remove owner" or similar inconsistent errors when `worker-indexer` is processing decoded data.
 
@@ -188,9 +192,9 @@ When indexed every block is marked as `not confirmed` unless it has some depth (
 changed before it reaches the desired number of `confirmations`, if that's the case, all blocks from that block and the transactions related
 are deleted and indexing is restarted to the last `confirmed` block.
 
-### If I add my chain to [safe-eth-py](https://github.com/safe-global/safe-eth-py/blob/master/gnosis/safe/addresses.py) will you support it?
+### If I add my chain to [safe-eth-py](https://github.com/safe-global/safe-eth-py/blob/main/safe_eth/safe/addresses.py) will you support it?
 No, for a chain to be supported we need to set up a dedicated infra for that network
-and [have a proper RPC](https://docs.safe.global/safe-core-api/rpc-requirements)
+and [have a proper RPC](https://docs.safe.global/core-api/api-safe-transaction-service/rpc-requirements)
 
 ### How can I interact with service?
 Aside from using standard HTTP requests:
