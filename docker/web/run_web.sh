@@ -2,6 +2,8 @@
 
 set -euo pipefail
 
+source "$(dirname "$0")/datadog_tracer.sh"
+
 echo "==> $(date +%H:%M:%S) ==> Collecting statics... "
 DOCKER_SHARED_DIR=/nginx
 rm -rf $DOCKER_SHARED_DIR/*
@@ -12,4 +14,4 @@ echo "==> $(date +%H:%M:%S) ==> Send via Slack info about service version and ne
 python manage.py send_slack_notification &
 
 echo "==> $(date +%H:%M:%S) ==> Running Gunicorn... "
-exec gunicorn --config gunicorn.conf.py --pythonpath "$PWD" -b unix:$DOCKER_SHARED_DIR/gunicorn.socket -b 0.0.0.0:8888 config.wsgi:application
+exec "${DDTRACE_RUN[@]}" gunicorn --config gunicorn.conf.py --pythonpath "$PWD" -b unix:$DOCKER_SHARED_DIR/gunicorn.socket -b 0.0.0.0:8888 config.wsgi:application

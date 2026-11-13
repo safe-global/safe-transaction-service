@@ -50,6 +50,9 @@ This repository includes multiple indexers under `safe_transaction_service/histo
 - All `uv sync` calls use `--frozen`. CI is the canonical way to update dependencies; never bypass the lockfile locally.
 - `[tool.uv] exclude-newer = "7 days"` rejects packages published less than 7 days ago. If `uv lock` fails due to a recently released pin, revert it to the previous version and re-pin after 7 days.
 
+## Datadog APM
+- `ddtrace` is a locked dependency. A truthy `DD_APM_ENABLED` (`true`, `1`, `yes`, ...) starts every process with `ddtrace-run`, default off. It is read by `docker/web/datadog_tracer.sh`, not by Django settings. See README "Datadog APM".
+
 ## Docs
 - Use reST for annotating Python functions.
 
