@@ -2,6 +2,8 @@
 
 set -euo pipefail
 
+source "$(dirname "$0")/../../datadog_tracer.sh"
+
 TASK_CONCURRENCY=${CELERYD_CONCURRENCY:-5000}
 PREFETCH_MULTIPLIER=${CELERYD_PREFETCH_MULTIPLIER:-2}  # Default is 4
 
@@ -29,7 +31,7 @@ echo "==> $(date +%H:%M:%S) ==> Check RPC connected matches previously used RPC.
 python manage.py check_chainid_matches
 
 echo "==> $(date +%H:%M:%S) ==> Running Celery worker for queues $WORKER_QUEUES with concurrency $TASK_CONCURRENCY <=="
-exec celery --no-color -A config.celery_app worker \
+exec "${DDTRACE_RUN[@]}" celery --no-color -A config.celery_app worker \
      --pool=gevent \
      --loglevel $log_level \
      --concurrency="${TASK_CONCURRENCY}" \
