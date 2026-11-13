@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: FSL-1.1-MIT
 import logging
 import socket
+import time
 from functools import cache
 from typing import Any, NamedTuple
 
@@ -38,6 +39,8 @@ class SerializedEvent(NamedTuple):
     body: bytes
     routing_key: str
     safe_req_id: str | None
+    # Kept for buffered events, so their time in the buffer counts as delivery lag
+    created_at_seconds: int
 
 
 class BaseQueueService:
@@ -173,6 +176,7 @@ class QueueService(BaseQueueService):
                 content_type="application/json",
                 content_encoding="utf-8",
                 app_id=EVENTS_APP_ID,
+                timestamp=event.created_at_seconds,
                 headers=(
                     {SAFE_REQ_ID_HEADER: event.safe_req_id}
                     if event.safe_req_id
@@ -232,6 +236,7 @@ class QueueService(BaseQueueService):
         :return: number of events published (payloads + any flushed unsent)
         """
         safe_req_id = get_safe_req_id()
+        created_at_seconds = int(time.time())
         events: list[SerializedEvent] = []
         for payload in payloads:
             try:
@@ -240,6 +245,7 @@ class QueueService(BaseQueueService):
                         orjson.dumps(payload),
                         self._build_routing_key(payload),
                         safe_req_id,
+                        created_at_seconds,
                     )
                 )
             except Exception:

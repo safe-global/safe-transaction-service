@@ -69,6 +69,31 @@ class TestQueueService(TestCase):
         self.assertEqual(EVENTS_APP_ID, "safe-transaction-service")
         self.assertEqual(msg.properties["app_id"], EVENTS_APP_ID)
 
+    def test_buffered_event_keeps_its_timestamp(self):
+        """A buffered event is published with its creation time, not the flush time"""
+        buffered_at_seconds = 1_767_268_800
+        flushed_at_seconds = buffered_at_seconds + 300
+        queue_service = QueueService()
+        queue_service.clear_unsent_events()
+        with (
+            mock.patch.object(
+                queue_service_module, "time", time=lambda: buffered_at_seconds
+            ),
+            mock.patch.object(QueueService, "_try_publish", return_value=False),
+        ):
+            queue_service.send_event({"message": "buffered"})
+
+        with mock.patch.object(
+            queue_service_module, "time", time=lambda: flushed_at_seconds
+        ):
+            queue_service.send_event({"message": "recovered"})
+        recovered = self._get_raw_message()
+        self.assertEqual(json.loads(recovered.body), {"message": "recovered"})
+        self.assertEqual(recovered.properties["timestamp"], flushed_at_seconds)
+        buffered = self._get_raw_message()
+        self.assertEqual(json.loads(buffered.body), {"message": "buffered"})
+        self.assertEqual(buffered.properties["timestamp"], buffered_at_seconds)
+
     def test_send_unsent_messages(self):
         queue_service = QueueService()
         messages_to_send = 10
