@@ -2,7 +2,7 @@
 import datetime
 import logging
 from collections import OrderedDict
-from collections.abc import Collection
+from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 
 from django.db import transaction
@@ -419,6 +419,58 @@ class IndexService:
             queryset = queryset.filter(safe_address__in=addresses)
         queryset.update(processed=False)
 
+    @transaction.atomic
+    def delete_executed_multisig_txs(
+        self, safe_tx_hashes: Sequence[bytes | str]
+    ) -> tuple[int, int]:
+        """
+        Delete executed multisig transactions created by the indexer and their
+        confirmations, without Django signals, so no events are sent. `approveHash`
+        confirmations are kept, as their transaction can be older than the deleted
+        execution. They are linked again when the multisig tx is created
+
+        :param safe_tx_hashes: Multisig transactions to delete
+        :return: Number of multisig transactions and confirmations deleted
+        """
+        MultisigConfirmation.objects.filter(
+            multisig_transaction_id__in=safe_tx_hashes
+        ).exclude(ethereum_tx=None).update(multisig_transaction=None)
+        deleted_confirmations = _raw_delete(
+            MultisigConfirmation.objects.filter(
+                multisig_transaction_id__in=safe_tx_hashes
+            )
+        )
+        deleted_txs = _raw_delete(
+            MultisigTransaction.objects.filter(pk__in=safe_tx_hashes)
+        )
+        return deleted_txs, deleted_confirmations
+
+    @transaction.atomic
+    def unlink_executed_multisig_txs(
+        self, safe_tx_hashes: Sequence[bytes | str]
+    ) -> tuple[int, int]:
+        """
+        Unlink executed multisig transactions proposed by users from their ethereum
+        tx, without Django signals, so no events are sent. Processing links them
+        again by `safe_tx_hash`. The confirmations built from the execution
+        signatures are deleted: `SafeTxProcessor` stores them with the block
+        timestamp as `created`, API confirmations use the time they were received
+
+        :param safe_tx_hashes: Multisig transactions to unlink
+        :return: Number of multisig transactions unlinked and confirmations deleted
+        """
+        deleted_confirmations = _raw_delete(
+            MultisigConfirmation.objects.filter(
+                multisig_transaction_id__in=safe_tx_hashes,
+                ethereum_tx=None,
+                created=F("multisig_transaction__ethereum_tx__block__timestamp"),
+            )
+        )
+        unlinked_txs = MultisigTransaction.objects.filter(pk__in=safe_tx_hashes).update(
+            ethereum_tx=None, failed=None, payment=None
+        )
+        return unlinked_txs, deleted_confirmations
+
     def _reset_executed_multisig_txs(
         self, address: ChecksumAddress, timestamp: datetime.datetime
     ) -> None:
@@ -439,27 +491,12 @@ class IndexService:
         multisig_txs = MultisigTransaction.objects.filter(
             safe=address, ethereum_tx__block__timestamp__gte=timestamp
         )
-        indexer_safe_tx_hashes = list(
-            multisig_txs.transactions_via_indexer().values_list(
-                "safe_tx_hash", flat=True
+        deleted_txs, deleted_confirmations = self.delete_executed_multisig_txs(
+            list(
+                multisig_txs.transactions_via_indexer().values_list(
+                    "safe_tx_hash", flat=True
+                )
             )
-        )
-        api_safe_tx_hashes = list(
-            multisig_txs.transactions_via_api().values_list("safe_tx_hash", flat=True)
-        )
-
-        # `approveHash` confirmations are kept, as their transaction can be older
-        # than `timestamp`. They are linked again when the multisig tx is created
-        MultisigConfirmation.objects.filter(
-            multisig_transaction_id__in=indexer_safe_tx_hashes
-        ).exclude(ethereum_tx=None).update(multisig_transaction=None)
-        deleted_confirmations = _raw_delete(
-            MultisigConfirmation.objects.filter(
-                multisig_transaction_id__in=indexer_safe_tx_hashes
-            )
-        )
-        deleted_txs = _raw_delete(
-            MultisigTransaction.objects.filter(pk__in=indexer_safe_tx_hashes)
         )
         logger.info(
             "[%s] Removed %d executed multisig txs created by the indexer and %d confirmations",
@@ -467,20 +504,13 @@ class IndexService:
             deleted_txs,
             deleted_confirmations,
         )
-
-        # `SafeTxProcessor` stores the confirmations built from the execution
-        # signatures with the block timestamp as `created`. API confirmations use
-        # the time they were received
-        deleted_confirmations = _raw_delete(
-            MultisigConfirmation.objects.filter(
-                multisig_transaction_id__in=api_safe_tx_hashes,
-                ethereum_tx=None,
-                created=F("multisig_transaction__ethereum_tx__block__timestamp"),
+        unlinked_txs, deleted_confirmations = self.unlink_executed_multisig_txs(
+            list(
+                multisig_txs.transactions_via_api().values_list(
+                    "safe_tx_hash", flat=True
+                )
             )
         )
-        unlinked_txs = MultisigTransaction.objects.filter(
-            pk__in=api_safe_tx_hashes
-        ).update(ethereum_tx=None)
         logger.info(
             "[%s] Unlinked %d executed multisig txs proposed by users and removed %d confirmations",
             address,
