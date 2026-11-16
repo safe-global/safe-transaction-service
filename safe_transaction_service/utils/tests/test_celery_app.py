@@ -7,7 +7,7 @@ from unittest import mock
 from django.conf import settings
 from django.test import SimpleTestCase
 
-from config.celery_app import close_db_connections
+from config.celery_app import app, close_db_connections
 
 
 class TestCeleryApp(SimpleTestCase):
@@ -134,6 +134,18 @@ thread.join()
                 "safe_transaction_service indexing",
             ],
         )
+
+    def test_control_and_event_queues_are_durable_and_not_exclusive(self):
+        """
+        Control and event queues are durable and not exclusive, and Celery can build
+        the control mailbox
+        """
+        mailbox = app.control.mailbox
+
+        self.assertTrue(mailbox.queue_durable)
+        self.assertFalse(mailbox.queue_exclusive)
+        self.assertTrue(app.conf.event_queue_durable)
+        self.assertFalse(app.conf.event_queue_exclusive)
 
     def test_db_connections_closed_after_task(self):
         conn_to_close = mock.Mock(in_atomic_block=False)
