@@ -246,11 +246,19 @@ CELERY_BROKER_POOL_LIMIT = env.int("CELERY_BROKER_POOL_LIMIT", default=10)
 CELERY_BROKER_HEARTBEAT = env.int("CELERY_BROKER_HEARTBEAT", default=120)
 
 # Control and event queues must be durable, as RabbitMQ >=4.3 denies declaring
-# transient non-exclusive queues
+# transient non-exclusive queues. They must not be exclusive: Celery refuses durable
+# exclusive queues, and exclusive queues make a worker that restarts with the same
+# hostname fail with ResourceLocked while the broker still holds the old connection
 # https://docs.celeryq.dev/en/stable/userguide/configuration.html#std-setting-control_queue_durable
 CELERY_CONTROL_QUEUE_DURABLE = env.bool("CELERY_CONTROL_QUEUE_DURABLE", default=True)
+# https://docs.celeryq.dev/en/stable/userguide/configuration.html#std-setting-control_queue_exclusive
+CELERY_CONTROL_QUEUE_EXCLUSIVE = env.bool(
+    "CELERY_CONTROL_QUEUE_EXCLUSIVE", default=False
+)
 # https://docs.celeryq.dev/en/stable/userguide/configuration.html#std-setting-event_queue_durable
 CELERY_EVENT_QUEUE_DURABLE = env.bool("CELERY_EVENT_QUEUE_DURABLE", default=True)
+# https://docs.celeryq.dev/en/stable/userguide/configuration.html#std-setting-event_queue_exclusive
+CELERY_EVENT_QUEUE_EXCLUSIVE = env.bool("CELERY_EVENT_QUEUE_EXCLUSIVE", default=False)
 
 # https://docs.celeryq.dev/en/stable/userguide/configuration.html#std-setting-broker_connection_max_retries
 CELERY_BROKER_CONNECTION_MAX_RETRIES = (
