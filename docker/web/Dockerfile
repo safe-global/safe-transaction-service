@@ -1,46 +1,45 @@
-FROM python:3.13-slim
+# Dependabot only updates image versions in FROM lines
+FROM ghcr.io/astral-sh/uv:0.13.7 AS uv
 
-ARG APP_HOME=/app
-WORKDIR ${APP_HOME}
-ENV PYTHONUNBUFFERED=1
+FROM python:3.13.18-slim AS prod-deps
+COPY --from=uv /uv /usr/local/bin/uv
+WORKDIR /app
+RUN --mount=type=cache,id=uv,target=/root/.cache/uv \
+    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+    --mount=type=bind,source=uv.lock,target=uv.lock \
+    uv sync --frozen --no-dev --no-install-project --compile-bytecode --link-mode=copy --no-python-downloads
 
-# https://eth-hash.readthedocs.io/en/latest/quickstart.html#specify-backend-by-environment-variable
-# `pysha3` is way faster than `pycryptodome` for CPython
-ENV ETH_HASH_BACKEND=pysha3
+FROM python:3.13.18-slim AS production
 
-# Install uv — copy binary from official image, no pip bootstrap needed
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+# The python image ships the stdlib without bytecode, and the app user cannot write
+# __pycache__ in /usr/local. pip in the base site-packages is not used.
+RUN python -m compileall -q -j0 -x '/site-packages/' /usr/local/lib
 
-ENV VIRTUAL_ENV=${APP_HOME}/.venv
-ENV PATH="${APP_HOME}/.venv/bin:${PATH}"
-
-COPY pyproject.toml uv.lock ./
-RUN set -ex \
-	&& buildDeps=" \
-		build-essential \
-        git \
-		libssl-dev \
-        libpq-dev \
-		" \
-    && apt-get update \
+# /nginx is shared with the nginx container (static files and the app socket)
+RUN apt-get update \
     && apt-get upgrade -y \
-    && apt-get install -y --no-install-recommends $buildDeps tmux postgresql-client \
-    && uv sync --no-dev --frozen --no-install-project \
-    && apt-get purge -y --auto-remove $buildDeps \
-    && rm -rf /var/lib/apt/lists/*
+    && apt-get install -y --no-install-recommends postgresql-client tmux \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd -g 999 python \
+    && useradd -u 999 -r -g python python \
+    && mkdir /nginx \
+    && chown python:python /nginx
 
-# /nginx mount point must be created before so it doesn't have root permissions
-# ${APP_HOME} root folder will not be updated by COPY --chown, so permissions need to be adjusted
-RUN groupadd -g 999 python && \
-    useradd -u 999 -r -g python python && \
-    mkdir -p /nginx && \
-    chown -R python:python /nginx ${APP_HOME}
-COPY --chown=python:python . .
+ENV PYTHONUNBUFFERED=1 \
+    ETH_HASH_BACKEND=pysha3 \
+    GUNICORN_CMD_ARGS=--no-control-socket \
+    PATH="/app/.venv/bin:${PATH}"
+WORKDIR /app
+
+COPY --from=prod-deps /app/.venv ./.venv
+COPY . .
+RUN DJANGO_SETTINGS_MODULE=config.settings.production DJANGO_DOT_ENV_FILE=.env.tracing.sample python manage.py collectstatic --noinput && install -d -o python -g python safe_transaction_service/media
+# The app user cannot write __pycache__ in /app
+RUN python -m compileall -q -x '/\.venv/' .
 
 # Use numeric ids so kubernetes identifies the user correctly
 USER 999:999
-
-RUN DJANGO_SETTINGS_MODULE=config.settings.production DJANGO_DOT_ENV_FILE=.env.tracing.sample python manage.py collectstatic --noinput
+EXPOSE 8888
 
 # Declared last so a new commit does not invalidate the cached layers above
 ARG BUILD_COMMIT
