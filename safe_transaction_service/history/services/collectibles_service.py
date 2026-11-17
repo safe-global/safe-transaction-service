@@ -625,7 +625,7 @@ class CollectiblesService:
                 )
             }
             logger.debug("Got token uris from blockchain")
-        except (OSError, ValueError):
+        except OSError, ValueError:
             logger.warning(
                 "Problem when getting token uris from blockchain, trying individually",
                 exc_info=True,

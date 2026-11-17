@@ -125,12 +125,12 @@ class AboutEthereumRPCView(APIView):
     def _get_info(self, ethereum_client: EthereumClient) -> dict[str, Any]:
         try:
             client_version = ethereum_client.w3.client_version
-        except (OSError, ValueError):
+        except OSError, ValueError:
             client_version = "Error getting client version"
 
         try:
             syncing = ethereum_client.w3.eth.syncing
-        except (OSError, ValueError):
+        except OSError, ValueError:
             syncing = "Error getting syncing status"
 
         ethereum_chain_id = get_chain_id()

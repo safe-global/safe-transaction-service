@@ -28,7 +28,7 @@ class ProxyFactoryIndexerProvider:
         return cls.instance
 
     @classmethod
-    def get_new_instance(cls) -> "ProxyFactoryIndexer":
+    def get_new_instance(cls) -> ProxyFactoryIndexer:
         from django.conf import settings
 
         return ProxyFactoryIndexer(EthereumClient(settings.ETHEREUM_NODE_URL))

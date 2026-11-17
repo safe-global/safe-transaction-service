@@ -213,7 +213,7 @@ class IndexService:
 
         try:
             current_block_number = self.ethereum_client.current_block_number
-        except (OSError, ValueError):
+        except OSError, ValueError:
             # If there's an error connecting to the node or invalid response we consider the service as out of sync
             return False
 
@@ -267,7 +267,7 @@ class IndexService:
 
     def txs_create_or_update_from_tx_hashes(
         self, tx_hashes: Collection[str | bytes]
-    ) -> list["EthereumTx"]:
+    ) -> list[EthereumTx]:
         """
         :param tx_hashes:
         :return: List of EthereumTx in the same order that `tx_hashes` were provided

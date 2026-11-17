@@ -2,7 +2,7 @@
 import logging
 import os
 from json import JSONDecodeError
-from typing import Optional, TypedDict
+from typing import TypedDict
 from urllib.parse import parse_qsl, urlencode, urljoin, urlparse, urlunparse
 
 from django.conf import settings
@@ -32,7 +32,7 @@ from .exceptions import TokenListRetrievalException
 logger = logging.getLogger(__name__)
 
 
-def get_token_logo_path(instance: "Token", filename):
+def get_token_logo_path(instance: Token, filename):
     # file will be uploaded to MEDIA_ROOT/<address>
     _, extension = os.path.splitext(filename)
     return f"tokens/logos/{instance.address}{extension}"  # extension includes '.'
@@ -84,9 +84,7 @@ class TokenManager(models.Manager):
             kwargs[field] = kwargs[field][:60]
         return super().create(**kwargs)
 
-    def create_from_blockchain(
-        self, token_address: ChecksumAddress
-    ) -> Optional["Token"]:
+    def create_from_blockchain(self, token_address: ChecksumAddress) -> Token | None:
         if TokenNotValid.objects.filter(address=token_address).exists():
             # If token is not valid, ignore it
             return None
@@ -122,7 +120,7 @@ class TokenManager(models.Manager):
                 # Make sure ERC721 is not indexed as an ERC20 for a node misbehaving
                 try:
                     decimals = ethereum_client.erc20.get_decimals(token_address)
-                except (Web3Exception, DecodingError, ValueError):
+                except Web3Exception, DecodingError, ValueError:
                     decimals = None
             except InvalidERC721Info:
                 logger.debug(
@@ -186,7 +184,7 @@ class TokenManager(models.Manager):
                     synced_logos += 1
                     token.save(update_fields=["logo"])
                     logger.info("Found logo on url %s", token.logo.url)
-            except (ClientError, FileNotFoundError):  # Depending on aws or filesystem
+            except ClientError, FileNotFoundError:  # Depending on aws or filesystem
                 logger.error("Error retrieving url %s", token.logo.url)
         return synced_logos
 

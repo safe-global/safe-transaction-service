@@ -2,6 +2,8 @@
 # See https://pre-commit.com/hooks.html for more hooks
 # `language: unsupported` needs pre-commit 4.4.0
 minimum_pre_commit_version: "4.4.0"
+default_language_version:
+  python: python3.14
 repos:
   - repo: https://github.com/Lucas-C/pre-commit-hooks
     rev: v1.5.6

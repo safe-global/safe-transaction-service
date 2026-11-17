@@ -43,7 +43,7 @@ class InternalTxIndexerProvider:
         return cls.instance
 
     @classmethod
-    def get_new_instance(cls) -> "InternalTxIndexer":
+    def get_new_instance(cls) -> InternalTxIndexer:
         from django.conf import settings
 
         if settings.ETH_INTERNAL_NO_FILTER:

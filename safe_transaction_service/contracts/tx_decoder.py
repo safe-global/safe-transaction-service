@@ -118,7 +118,7 @@ mutex = Lock()
 
 
 @cache
-def get_db_tx_decoder() -> "DbTxDecoder":
+def get_db_tx_decoder() -> DbTxDecoder:
     """
     :return: Tx decoder with every ABI in the database loaded and indexed by function opcode
     .. note::
@@ -130,7 +130,7 @@ def get_db_tx_decoder() -> "DbTxDecoder":
         if is_db_tx_decoder_loaded():
             return get_db_tx_decoder()
 
-        def _get_db_tx_decoder() -> "DbTxDecoder":
+        def _get_db_tx_decoder() -> DbTxDecoder:
             return DbTxDecoder()
 
         if running_on_gevent():
@@ -146,7 +146,7 @@ def is_db_tx_decoder_loaded() -> bool:
 
 
 @cache
-def get_safe_tx_decoder() -> "SafeTxDecoder":
+def get_safe_tx_decoder() -> SafeTxDecoder:
     return SafeTxDecoder()
 
 

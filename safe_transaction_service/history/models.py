@@ -11,10 +11,8 @@ from logging import getLogger
 from threading import Condition, Lock
 from typing import (
     Any,
-    Optional,
     Self,
     TypedDict,
-    Union,
 )
 
 from django.conf import settings
@@ -212,7 +210,7 @@ class BulkCreateSignalMixin:
 
 
 class IndexingStatusManager(models.Manager):
-    def get_erc20_721_indexing_status(self) -> "IndexingStatus":
+    def get_erc20_721_indexing_status(self) -> IndexingStatus:
         return self.get(indexing_type=IndexingStatusType.ERC20_721_EVENTS.value)
 
     def set_erc20_721_indexing_status(
@@ -269,7 +267,7 @@ class EthereumBlockManager(BulkCreateSignalMixin, models.Manager):
 
     def from_block_dict(
         self, block: BlockData, confirmed: bool = False
-    ) -> "EthereumBlock":
+    ) -> EthereumBlock:
         return EthereumBlock(
             number=block["number"],
             # Some networks like CELO don't provide gasLimit
@@ -283,7 +281,7 @@ class EthereumBlockManager(BulkCreateSignalMixin, models.Manager):
 
     def create_from_block_dict(
         self, block: BlockData, confirmed: bool = False
-    ) -> "EthereumBlock":
+    ) -> EthereumBlock:
         """
         :param block: Block Dict returned by web3.py
         :param confirmed: If True we will not check for reorgs in the future
@@ -385,7 +383,7 @@ class EthereumBlock(models.Model):
 class EthereumTxManager(BulkCreateSignalMixin, models.Manager):
     def from_tx_dict(
         self, tx: dict[str, Any], tx_receipt: dict[str, Any]
-    ) -> "EthereumTx":
+    ) -> EthereumTx:
         if tx_receipt is None:
             raise ValueError("tx_receipt cannot be empty")
 
@@ -445,7 +443,7 @@ class EthereumTxManager(BulkCreateSignalMixin, models.Manager):
         self,
         tx: dict[str, Any],
         tx_receipt: dict[str, Any],
-    ) -> "EthereumTx":
+    ) -> EthereumTx:
         ethereum_tx = self.from_tx_dict(tx, tx_receipt)
         ethereum_tx.save()
         return ethereum_tx
@@ -507,7 +505,7 @@ class EthereumTx(TimeStampedModel):
             return self.status == 1
 
     def update_with_block_and_receipt(
-        self, ethereum_block: "EthereumBlock", tx_receipt: dict[str, Any]
+        self, ethereum_block: EthereumBlock, tx_receipt: dict[str, Any]
     ):
         if self.block is None:
             self.block = ethereum_block
@@ -722,7 +720,7 @@ class ERC20Transfer(TokenTransfer):
         return f"ERC20 Transfer from={self._from} to={self.to} value={self.value}"
 
     @classmethod
-    def from_decoded_event(cls, event_data: EventData) -> "ERC20Transfer":
+    def from_decoded_event(cls, event_data: EventData) -> ERC20Transfer:
         """
         Does not create the model, as it requires that `ethereum_tx` exists
 
@@ -842,7 +840,7 @@ class ERC721Transfer(TokenTransfer):
         )
 
     @classmethod
-    def from_decoded_event(cls, event_data: EventData) -> "ERC721Transfer":
+    def from_decoded_event(cls, event_data: EventData) -> ERC721Transfer:
         """
         Does not create the model, as it requires that `ethereum_tx` exists
 
@@ -887,7 +885,7 @@ class InternalTxManager(BulkCreateSignalMixin, models.Manager):
 
     def build_from_trace(
         self, trace: dict[str, Any], ethereum_tx: EthereumTx
-    ) -> "InternalTx":
+    ) -> InternalTx:
         """
         Build a InternalTx object from trace, but it doesn't insert it on database
         :param trace:
@@ -920,7 +918,7 @@ class InternalTxManager(BulkCreateSignalMixin, models.Manager):
 
     def get_or_create_from_trace(
         self, trace: dict[str, Any], ethereum_tx: EthereumTx
-    ) -> tuple["InternalTx", bool]:
+    ) -> tuple[InternalTx, bool]:
         tx_type = InternalTxType.parse(trace["type"])
         call_type = EthereumTxCallType.parse_call_type(trace["action"].get("callType"))
         trace_address_str = self._trace_address_to_str(trace["traceAddress"])
@@ -949,9 +947,9 @@ class InternalTxManager(BulkCreateSignalMixin, models.Manager):
 
     def store_internal_txs_and_decoded_in_db(
         self,
-        internal_txs: list["InternalTx"],
-        internal_txs_decoded: list["InternalTxDecoded"],
-    ) -> list["InternalTx"]:
+        internal_txs: list[InternalTx],
+        internal_txs_decoded: list[InternalTxDecoded],
+    ) -> list[InternalTx]:
         """
         Store internal txs and internal txs decoded in the most optimal way.
 
@@ -984,7 +982,7 @@ class InternalTxManager(BulkCreateSignalMixin, models.Manager):
         )
         if already_stored:
 
-            def is_already_stored(internal_tx: "InternalTx") -> bool:
+            def is_already_stored(internal_tx: InternalTx) -> bool:
                 return (
                     to_0x_hex_str(HexBytes(internal_tx.ethereum_tx_id)),
                     internal_tx.trace_address,
@@ -1320,7 +1318,7 @@ class InternalTx(models.Model):
         else:
             return [int(x) for x in self.trace_address.split(",")]
 
-    def get_parent(self) -> Optional["InternalTx"]:
+    def get_parent(self) -> InternalTx | None:
         if (
             "," not in self.trace_address
         ):  # We are expecting something like 0,0,1 or 1,1
@@ -1333,7 +1331,7 @@ class InternalTx(models.Model):
         except InternalTx.DoesNotExist:
             return None
 
-    def get_child(self, index: int) -> Optional["InternalTx"]:
+    def get_child(self, index: int) -> InternalTx | None:
         child_trace_address = f"{self.trace_address},{index}"
         try:
             return InternalTx.objects.filter(
@@ -1528,7 +1526,7 @@ class MultisigTransactionManager(models.Manager):
         if nonce_query:
             return nonce_query["nonce"]
 
-    def last_valid_transaction(self, safe: str) -> Optional["MultisigTransaction"]:
+    def last_valid_transaction(self, safe: str) -> MultisigTransaction | None:
         """
         Find last transaction where signers match the owners registered for that Safe. Transactions out of sync
         have an invalid `safeNonce`, so `safeTxHash` is not valid and owners recovered from the signatures wouldn't be
@@ -2157,8 +2155,8 @@ class SafeContractManager(models.Manager):
         return set(self.filter(address__in=addresses).values_list("address", flat=True))
 
     def upsert_from_ethereum_tx(
-        self, address: ChecksumAddress, ethereum_tx: "EthereumTx"
-    ) -> "SafeContract":
+        self, address: ChecksumAddress, ethereum_tx: EthereumTx
+    ) -> SafeContract:
         """
         Insert a new SafeContract or update ``ethereum_tx_id`` on conflict. Single query.
 
@@ -2179,7 +2177,7 @@ class SafeContractManager(models.Manager):
 class SafeContractQuerySet(models.QuerySet):
     def banned(
         self, addresses: list[ChecksumAddress] | None = None
-    ) -> QuerySet["SafeContract"]:
+    ) -> QuerySet[SafeContract]:
         """
         :param addresses: If provided, only those `addresses` will be filtered.
         :return: Banned addresses
@@ -2223,7 +2221,7 @@ class SafeContract(models.Model):
 class SafeContractDelegateManager(models.Manager):
     def get_for_safe(
         self, safe_address: ChecksumAddress, owner_addresses: Sequence[ChecksumAddress]
-    ) -> QuerySet["SafeContractDelegate"]:
+    ) -> QuerySet[SafeContractDelegate]:
         if not owner_addresses:
             return self.none()
 
@@ -2241,7 +2239,7 @@ class SafeContractDelegateManager(models.Manager):
         safe_address: ChecksumAddress,
         owner_addresses: Sequence[ChecksumAddress],
         delegate: ChecksumAddress,
-    ) -> QuerySet["SafeContractDelegate"]:
+    ) -> QuerySet[SafeContractDelegate]:
         return self.get_for_safe(safe_address, owner_addresses).filter(
             delegate=delegate
         )
@@ -2344,7 +2342,7 @@ class SafeRelevantTransaction(models.Model):
     @classmethod
     def from_erc20_721_event(
         cls, event_data: EventData
-    ) -> list["SafeRelevantTransaction"]:
+    ) -> list[SafeRelevantTransaction]:
         """
         Does not create the model, as it requires that `ethereum_tx` exists
 
@@ -2427,8 +2425,8 @@ class SafeStatusBase(models.Model):
 
     @classmethod
     def from_status_instance(
-        cls, safe_status_base: "SafeStatusBase"
-    ) -> Union["SafeStatus", "SafeLastStatus"]:
+        cls, safe_status_base: SafeStatusBase
+    ) -> SafeStatus | SafeLastStatus:
         """
         Converts from SafeStatus to SafeLastStatus and vice versa
         """
@@ -2447,7 +2445,7 @@ class SafeStatusBase(models.Model):
 
 
 class SafeLastStatusManager(models.Manager):
-    def get_or_generate(self, address: ChecksumAddress) -> "SafeLastStatus":
+    def get_or_generate(self, address: ChecksumAddress) -> SafeLastStatus:
         """
         :param address:
         :return: `SafeLastStatus` if it exists. If not, it will try to build it from `SafeStatus` table
@@ -2463,8 +2461,8 @@ class SafeLastStatusManager(models.Manager):
             raise
 
     def update_or_create_from_safe_status(
-        self, safe_status: "SafeStatus"
-    ) -> "SafeLastStatus":
+        self, safe_status: SafeStatus
+    ) -> SafeLastStatus:
         obj, _ = self.update_or_create(
             address=safe_status.address,
             defaults={
@@ -2499,7 +2497,7 @@ class SafeLastStatusManager(models.Manager):
 
         return self.safes_for_owner(owner_address).values_list("address", flat=True)
 
-    def safes_for_owner(self, owner_address: str) -> QuerySet["SafeLastStatus"]:
+    def safes_for_owner(self, owner_address: str) -> QuerySet[SafeLastStatus]:
         """
         :param owner_address:
         :return: SafeLastStatus queryset where the provided `owner_address` is an owner.
@@ -2509,7 +2507,7 @@ class SafeLastStatusManager(models.Manager):
             address__in=SafeContract.objects.get_banned_addresses()
         )
 
-    def safes_for_module(self, module_address: str) -> QuerySet["SafeLastStatus"]:
+    def safes_for_module(self, module_address: str) -> QuerySet[SafeLastStatus]:
         """
         :param module_address:
         :return: SafeLastStatus queryset where the provided `module_address` is enabled.
@@ -2594,7 +2592,7 @@ class SafeStatusQuerySet(models.QuerySet):
             .sorted_by_mined()
         )
 
-    def last_for_address(self, address: str) -> Optional["SafeStatus"]:
+    def last_for_address(self, address: str) -> SafeStatus | None:
         return self.filter(address=address).sorted_by_mined().first()
 
 
@@ -2630,7 +2628,7 @@ class SafeStatus(SafeStatusBase):
     def block_number(self) -> int:
         return self.internal_tx.ethereum_tx.block_id
 
-    def previous(self) -> Optional["SafeStatus"]:
+    def previous(self) -> SafeStatus | None:
         """
         :return: SafeStatus with the previous nonce
         """

@@ -355,7 +355,7 @@ class SafeService:
         for relay_contract, data_parameter, relay_addresses in self.relay_contracts:
             try:
                 _, decoded_relay_data = relay_contract.decode_function_input(data)
-            except (ValueError, DecodingError):
+            except ValueError, DecodingError:
                 # `ValueError` if the selector does not match, `DecodingError` if it matches but the payload
                 # has a different shape
                 continue
@@ -393,7 +393,7 @@ class SafeService:
             try:
                 _, data_decoded = proxy_factory_contract.decode_function_input(data)
                 break
-            except (ValueError, DecodingError):
+            except ValueError, DecodingError:
                 continue
 
         if data_decoded is None:
@@ -433,7 +433,7 @@ class SafeService:
             setup_data = data_decoded.get("data")
             salt_nonce = data_decoded.get("saltNonce")
             return ProxyCreationData(master_copy, setup_data, salt_nonce)
-        except (ValueError, DecodingError):
+        except ValueError, DecodingError:
             return None
 
     def _get_next_internal_tx(self, internal_tx: InternalTx) -> InternalTx | None:
@@ -450,7 +450,7 @@ class SafeService:
             return next_traces and InternalTx.objects.build_from_trace(
                 next_traces[0], internal_tx.ethereum_tx
             )
-        except (ValueError, Web3RPCError):
+        except ValueError, Web3RPCError:
             return None
 
     def _get_parent_internal_tx(self, internal_tx: InternalTx) -> InternalTx | None:
@@ -467,5 +467,5 @@ class SafeService:
             return previous_trace and InternalTx.objects.build_from_trace(
                 previous_trace, internal_tx.ethereum_tx
             )
-        except (ValueError, Web3RPCError):
+        except ValueError, Web3RPCError:
             return None

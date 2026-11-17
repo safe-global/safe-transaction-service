@@ -48,7 +48,7 @@ class Erc20EventsIndexerProvider:
         return cls.instance
 
     @classmethod
-    def get_new_instance(cls) -> "Erc20EventsIndexer":
+    def get_new_instance(cls) -> Erc20EventsIndexer:
         from django.conf import settings
 
         return Erc20EventsIndexer(

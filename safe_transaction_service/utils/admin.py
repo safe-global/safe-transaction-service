@@ -91,7 +91,7 @@ class AdvancedAdminSearchMixin:
                         # This is the main difference comparing to Django official implementation
                         queryset.filter(**{orm_lookup: bit})
                         valid_queries.append((orm_lookup, bit))
-                    except (ValueError, ValidationError):
+                    except ValueError, ValidationError:
                         pass
                 or_queries = models.Q.create(
                     list(valid_queries),

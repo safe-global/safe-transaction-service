@@ -228,7 +228,7 @@ class EventsIndexer(EthereumIndexer):
             # One topic can have multiple matching ABIs due to `indexed` elements changing how to decode it
             try:
                 return event_to_listen.process_log(log_receipt)
-            except (LogTopicError, DecodingError):
+            except LogTopicError, DecodingError:
                 continue
 
         logger.error(
