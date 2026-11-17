@@ -62,6 +62,8 @@ class JsonLog:
     message: str
     lineno: int
     contextMessage: ContextMessageLog | None = None
+    # Datadog reads dd.trace_id and dd.span_id to link the log to its APM trace
+    dd: dict[str, str] | None = None
 
     def _remove_null_values_from_log(self, json_log: dict):
         """
@@ -96,6 +98,32 @@ def http_request_log(
         timestamp=timestamp or get_milliseconds_now(),
         body=request.data if log_data else None,
     )
+
+
+DATADOG_SERVICE_FIELDS = ("service", "version", "env")
+DATADOG_TRACE_FIELDS = ("trace_id", "span_id", *DATADOG_SERVICE_FIELDS)
+
+
+def get_datadog_trace_fields(record: logging.LogRecord) -> dict[str, str] | None:
+    """
+    Return the dd.* attributes ddtrace adds to the record, or None without ddtrace.
+    Outside a span ddtrace sets trace_id and span_id to "0", so they are left out.
+    Empty values are left out too, and None is returned when all are empty.
+    ddtrace sets version and env to "" when DD_VERSION and DD_ENV are not set.
+
+    :param record: log record, carrying `dd.*` attributes when ddtrace is running
+    :return: the Datadog trace fields, or `None` without ddtrace or when all are empty
+    """
+    if not hasattr(record, "dd.trace_id"):
+        return None
+    is_inside_span = getattr(record, "dd.trace_id") != "0"
+    fields = DATADOG_TRACE_FIELDS if is_inside_span else DATADOG_SERVICE_FIELDS
+    trace_fields = {
+        field: value
+        for field in fields
+        if (value := getattr(record, f"dd.{field}", ""))
+    }
+    return trace_fields or None
 
 
 class SafeJsonFormatter(logging.Formatter):
@@ -148,6 +176,7 @@ class SafeJsonFormatter(logging.Formatter):
             message=record.getMessage(),
             contextMessage=context_message,
             lineno=record.lineno,
+            dd=get_datadog_trace_fields(record),
         )
 
         return json_log.to_json()
