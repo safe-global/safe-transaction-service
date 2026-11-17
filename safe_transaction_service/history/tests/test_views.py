@@ -2795,6 +2795,17 @@ class TestViewsV150(SafeTestCaseMixin, APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
+        # Test not internal server error on approved hash signature
+        data["signature"] = to_0x_hex_str(
+            signature_to_bytes(1, int(delegator.address, 16), 0)
+        )
+        response = self.client.post(url, format="json", data=data)
+        self.assertIn(
+            "Approved hash signatures are not supported",
+            response.data["non_field_errors"][0],
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
         self.assertEqual(SafeContractDelegate.objects.count(), 2)
         queryset = SafeContractDelegate.objects.get_for_safe(
             safe_address, [delegator.address]

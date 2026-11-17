@@ -352,6 +352,35 @@ class TestViewsV2V150(SafeTestCaseMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(SafeContractDelegate.objects.count(), 1)
 
+    def test_delegate_creation_with_approved_hash_signature(self):
+        """
+        Some wallets return v = 0/1 for an ECDSA signature. In a Safe signature v = 1
+        is an approved hash, which cannot sign a delegate message: 400, not 500
+        """
+        delegate = Account.create()
+        delegator = Account.create()
+        hash_to_sign, _ = DelegateSignatureHelperV2.calculate_hash_and_preimage(
+            delegate.address, self.ethereum_client.get_chain_id(), False
+        )
+        signature = HexBytes(delegator.unsafe_sign_hash(hash_to_sign)["signature"])
+        data = {
+            "label": "Kim Wexler",
+            "delegate": delegate.address,
+            "delegator": delegator.address,
+            "signature": to_0x_hex_str(signature[:64] + bytes([1])),
+        }
+
+        response = self.client.post(
+            reverse("v2:history:delegates"), format="json", data=data
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn(
+            "Approved hash signatures are not supported",
+            response.data["non_field_errors"][0],
+        )
+        self.assertEqual(SafeContractDelegate.objects.count(), 0)
+
     def test_delegate_creation_without_chain_id_with_safe(self):
         safe = SafeContractFactory()
         chain_id = None
