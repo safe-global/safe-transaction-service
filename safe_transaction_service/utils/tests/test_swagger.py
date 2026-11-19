@@ -207,9 +207,14 @@ class TestSwaggerView(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         # Swagger UI sends this token in the CSRF header of its non-GET requests
         match = re.search(
-            r'request\.headers\["X-CSRFTOKEN"\] = "(\w+)";', response.content.decode()
+            r"""request\.headers\[["'](?i:X-CSRFToken)["']\]\s*=\s*["'](\w+)["']""",
+            response.content.decode(),
         )
-        self.assertIsNotNone(match)
+        self.assertIsNotNone(
+            match,
+            "CSRF token assignment not found in the Swagger page, "
+            "the drf-spectacular Swagger template may have changed",
+        )
         return match.group(1)
 
     @override_settings(CACHES=LOCAL_STORAGE_LOCMEM)
@@ -226,10 +231,12 @@ class TestSwaggerView(TestCase):
         token_b = self.get_swagger_csrf_token(client_b)
 
         self.assertNotEqual(token_a, token_b)
-        # A CSRF protected view accepts the token of B's page with B's cookie
+        # A CSRF protected view accepts the token of B's page with B's cookie: the
+        # admin login passes the CSRF check and re-renders the form for the wrong
+        # credentials
         response = client_b.post(
             reverse("admin:login"),
             {"username": "visitor", "password": "wrong"},
             headers={"X-CSRFToken": token_b},
         )
-        self.assertNotEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
