@@ -29,9 +29,10 @@ def cached_schema_view(view):
 schema_json_view = cached_schema_view(SpectacularAPIView.as_view())
 
 swagger_urlpatterns = [
+    # Not cached: the page embeds the CSRF token of the visitor
     path(
         "",
-        cached_schema_view(SpectacularSwaggerView.as_view(url_name="schema-json")),
+        SpectacularSwaggerView.as_view(url_name="schema-json"),
         name="schema-swagger-ui",
     ),
     re_path(
