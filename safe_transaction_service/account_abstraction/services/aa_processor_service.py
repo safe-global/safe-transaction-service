@@ -47,7 +47,7 @@ class UserOperationReceiptNotFoundException(AaProcessorServiceException):
 
 
 @cache
-def get_aa_processor_service() -> "AaProcessorService":
+def get_aa_processor_service() -> AaProcessorService:
     ethereum_client = get_auto_ethereum_client()
     bundler_client = get_bundler_client()
     if not bundler_client:

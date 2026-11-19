@@ -1,7 +1,7 @@
 [project]
 name = "safe-transaction-service"
 dynamic = ["version"]
-requires-python = ">=3.13"
+requires-python = ">=3.14"
 dependencies = [
     "boto3>=1.43.126",
     "cachetools==7.3.0",
@@ -73,7 +73,7 @@ exclude-newer-package = { safe-eth-py = false }
 
 [tool.ruff]
 line-length = 88
-target-version = "py313"
+target-version = "py314"
 exclude = [
 	".tox", ".git", "*/migrations/*", "*/static/CACHE/*",
 	"docs", "node_modules", "venv"
@@ -104,7 +104,7 @@ section-order = [
 ]
 
 [tool.mypy]
-python_version = "3.13"
+python_version = "3.14"
 check_untyped_defs = true
 ignore_missing_imports = true
 warn_unused_ignores = true

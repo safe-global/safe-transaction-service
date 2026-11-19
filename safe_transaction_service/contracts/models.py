@@ -19,7 +19,7 @@ from safe_eth.eth.utils import fast_keccak
 from web3._utils.normalizers import normalize_abi
 
 
-def get_contract_logo_path(instance: "Contract", filename):
+def get_contract_logo_path(instance: Contract, filename):
     # file will be uploaded to MEDIA_ROOT/<address>
     _, extension = os.path.splitext(filename)
     return f"contracts/logos/{instance.address}{extension}"  # extension includes '.'

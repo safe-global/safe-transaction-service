@@ -467,7 +467,7 @@ class SafeConfigSnapshot:
     enabled_modules: list[ChecksumAddress]
 
     @classmethod
-    def from_safe_status(cls, safe_status: SafeLastStatus) -> "SafeConfigSnapshot":
+    def from_safe_status(cls, safe_status: SafeLastStatus) -> SafeConfigSnapshot:
         return cls(
             owners=list(safe_status.owners),
             threshold=safe_status.threshold,

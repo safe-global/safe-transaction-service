@@ -50,7 +50,7 @@ class SafeEventsIndexerProvider:
         return cls.instance
 
     @classmethod
-    def get_new_instance(cls) -> "SafeEventsIndexer":
+    def get_new_instance(cls) -> SafeEventsIndexer:
         return SafeEventsIndexer(EthereumClient(settings.ETHEREUM_NODE_URL))
 
     @classmethod

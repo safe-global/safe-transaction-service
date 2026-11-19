@@ -1,7 +1,7 @@
 [![CI/CD](https://github.com/safe-global/safe-transaction-service/actions/workflows/python.yml/badge.svg)](https://github.com/safe-global/safe-transaction-service/actions/workflows/python.yml)
 [![Coverage Status](https://coveralls.io/repos/github/safe-global/safe-transaction-service/badge.svg?branch=main)](https://coveralls.io/github/safe-global/safe-transaction-service?branch=main)
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](https://github.com/pre-commit/pre-commit)
-![Python 3.13](https://img.shields.io/badge/Python-3.13-blue.svg)
+![Python 3.14](https://img.shields.io/badge/Python-3.14-blue.svg)
 ![Django 5](https://img.shields.io/badge/Django-5-blue.svg)
 [![Container image](https://img.shields.io/badge/ghcr.io-safe--global%2Fsafe--transaction--service-0b5d52?logo=github&logoColor=white)](https://github.com/safe-global/safe-transaction-service/pkgs/container/safe-transaction-service)
 

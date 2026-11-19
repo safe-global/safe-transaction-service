@@ -6,7 +6,7 @@ from safe_transaction_service.utils.redis import get_redis
 
 
 @cache
-def get_analytics_service() -> "AnalyticsService":
+def get_analytics_service() -> AnalyticsService:
     return AnalyticsService()
 
 

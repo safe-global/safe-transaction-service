@@ -70,7 +70,7 @@ def _parse_token_address_from_token_list(
         try:
             if resolved_address := ethereum_client.w3.ens.address(token_address):
                 return resolved_address
-        except (ValueError, Web3Exception):
+        except ValueError, Web3Exception:
             logger.warning("Cannot resolve %s ENS address", token_address)
     return None
 

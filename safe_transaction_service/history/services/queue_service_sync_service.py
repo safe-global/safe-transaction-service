@@ -163,7 +163,7 @@ def build_confirmation_fields(confirmation: dict[str, Any]) -> dict[str, Any]:
 
 
 @cache
-def get_queue_service_sync_service() -> "QueueServiceSyncService":
+def get_queue_service_sync_service() -> QueueServiceSyncService:
     return QueueServiceSyncService(
         QueueServiceClient(settings.QUEUE_SERVICE_URL),
         Connection(settings.EVENTS_QUEUE_URL),
