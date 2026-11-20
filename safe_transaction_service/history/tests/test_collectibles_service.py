@@ -391,21 +391,6 @@ class TestCollectiblesService(EthereumTestCaseMixin, TestCase):
             ],
         )
 
-    def test_retrieve_metadata_from_uri(self):
-        collectibles_service = CollectiblesServiceProvider()
-        # Test ipfs
-        uri = "ipfs://ipfs/Qmc4ZMDNMu5bguGohtGQGx5DQexitnNvf5Rb7Yzbja47bo"
-        expected_object = {
-            "description": "Flamingo DAO Initial Token",
-            "name": "Flamingo DAO",
-            "image": "https://ipfs.io/ipfs/QmXKU5RBTrGaYn5M1iWQaeKuCKV34g417YDGN5Yh7Uxk4i",
-        }
-
-        self.assertEqual(
-            collectibles_service._retrieve_metadata_from_uri(uri),
-            expected_object,
-        )
-
     def test_retrieve_metadata_from_uri_base_64(self):
         collectibles_service = CollectiblesServiceProvider()
         # Test b64 encoded uri

@@ -15,12 +15,17 @@ class TestQueueService(TestCase):
         # Create queue for test
         self.queue = "test_queue"
 
-        broker_connection.channel.queue_declare(self.queue)
+        # RabbitMQ 4 rejects transient queues that are not exclusive, and the
+        # tests read the queue from other connections, so it cannot be exclusive
+        broker_connection.channel.queue_declare(self.queue, durable=True)
         broker_connection.channel.queue_bind(
             self.queue, broker_connection.exchange_name
         )
         # Clean queue to avoid old messages
         broker_connection.channel.queue_purge(self.queue)
+
+    def tearDown(self):
+        BrokerConnection().channel.queue_delete(self.queue)
 
     def test_send_unsent_messages(self):
         queue_service = get_queue_service()
