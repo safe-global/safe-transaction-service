@@ -5,36 +5,407 @@ from unittest import mock
 from unittest.mock import MagicMock, PropertyMock
 
 from django.core.management import CommandError, call_command
+from django.db.models.signals import post_save
 from django.test import TestCase
 
+import factory
 from django_celery_beat.models import PeriodicTask
 from eth_account import Account
+from hexbytes import HexBytes
 from safe_eth.eth.account_abstraction import BundlerClient
 from safe_eth.eth.ethereum_client import EthereumClient, EthereumNetwork
+from safe_eth.eth.utils import fast_keccak_text
 from safe_eth.safe import Safe
+from safe_eth.safe.safe_signature import SafeSignatureType
 from safe_eth.safe.tests.safe_test_case import SafeTestCaseMixin
 from safe_eth.util.util import to_0x_hex_str
 
+from ...events.services.queue_service import QueueService
 from ..indexers import Erc20EventsIndexer, InternalTxIndexer, SafeEventsIndexer
 from ..models import (
+    EthereumTx,
     IndexingStatus,
     InternalTxDecoded,
+    MultisigConfirmation,
+    MultisigTransaction,
     ProxyFactory,
     SafeLastStatus,
     SafeMasterCopy,
+    TransactionServiceEventType,
 )
 from ..services import IndexServiceProvider
 from ..tasks import logger as task_logger
 from .factories import (
+    InternalTxDecodedFactory,
     MultisigConfirmationFactory,
     MultisigTransactionFactory,
     SafeContractFactory,
     SafeLastStatusFactory,
     SafeMasterCopyFactory,
 )
+from .utils import get_sent_event_types
 
 
 class TestCommands(SafeTestCaseMixin, TestCase):
+    def test_bind_confirmations(self):
+        """
+        Only unbound confirmations made on the transaction's Safe are bound to it
+        """
+        with factory.django.mute_signals(post_save):
+            multisig_tx = MultisigTransactionFactory(ethereum_tx=None)
+            same_safe_confirmation = MultisigConfirmationFactory(
+                multisig_transaction=None,
+                multisig_transaction_hash=multisig_tx.safe_tx_hash,
+                safe_address=multisig_tx.safe,
+            )
+            other_safe_confirmation = MultisigConfirmationFactory(
+                multisig_transaction=None,
+                multisig_transaction_hash=multisig_tx.safe_tx_hash,
+                safe_address=Account.create().address,
+            )
+
+        buf = StringIO()
+        call_command("bind_confirmations", stdout=buf)
+
+        same_safe_confirmation.refresh_from_db()
+        self.assertEqual(
+            same_safe_confirmation.multisig_transaction_id, multisig_tx.safe_tx_hash
+        )
+        other_safe_confirmation.refresh_from_db()
+        self.assertIsNone(other_safe_confirmation.multisig_transaction_id)
+        self.assertEqual(buf.getvalue().count("Bind confirmation"), 1)
+
+    def _create_approve_hash(
+        self,
+        safe_address: str,
+        approved_hash: str,
+        owner: str | None = None,
+        ethereum_tx: EthereumTx | None = None,
+        trace_address: str = "0",
+    ) -> EthereumTx:
+        """
+        Store a decoded ``approveHash`` called on ``safe_address``, with the owner in
+        the arguments like the L2 events indexer, or without it like the L1 traces
+
+        :return: Ethereum tx of the approval
+        """
+        arguments = {"hashToApprove": approved_hash}
+        if owner:
+            arguments["owner"] = owner
+        extra_fields = {"internal_tx__ethereum_tx": ethereum_tx} if ethereum_tx else {}
+        return InternalTxDecodedFactory(
+            function_name="approveHash",
+            arguments=arguments,
+            internal_tx___from=safe_address,
+            internal_tx__trace_address=trace_address,
+            internal_tx__value=0,
+            **extra_fields,
+        ).internal_tx.ethereum_tx
+
+    def _create_approval_without_safe_address(
+        self, approved_hash: str, owner: str, ethereum_tx: EthereumTx, **kwargs
+    ) -> MultisigConfirmation:
+        with factory.django.mute_signals(post_save):
+            return MultisigConfirmationFactory(
+                multisig_transaction_hash=approved_hash,
+                owner=owner,
+                ethereum_tx=ethereum_tx,
+                safe_address=None,
+                signature_type=SafeSignatureType.APPROVED_HASH.value,
+                **kwargs,
+            )
+
+    def test_backfill_multisig_confirmation_safe_address_fills_safe_address(self):
+        """
+        Approvals stored without Safe take the Safe where ``approveHash`` was called
+        in their ethereum tx. Approvals with no matching call, or approved on several
+        Safes, are skipped, and other confirmations are not read
+        """
+        safe_address = Account.create().address
+        l1_owner = Account.create().address
+        l2_owner = Account.create().address
+        l1_hash = to_0x_hex_str(fast_keccak_text("l1-approval"))
+        l2_hash = to_0x_hex_str(fast_keccak_text("l2-approval"))
+        l1_ethereum_tx = self._create_approve_hash(safe_address, l1_hash)
+        l2_ethereum_tx = self._create_approve_hash(
+            safe_address, l2_hash, owner=l2_owner
+        )
+        # Same hash approved by another owner on another Safe: not ambiguous on L2
+        self._create_approve_hash(
+            Account.create().address,
+            l2_hash,
+            owner=Account.create().address,
+            ethereum_tx=l2_ethereum_tx,
+            trace_address="1",
+        )
+        l1_approval = self._create_approval_without_safe_address(
+            l1_hash, l1_owner, l1_ethereum_tx, multisig_transaction=None
+        )
+        l2_approval = self._create_approval_without_safe_address(
+            l2_hash, l2_owner, l2_ethereum_tx, multisig_transaction=None
+        )
+        not_found_approval = self._create_approval_without_safe_address(
+            to_0x_hex_str(fast_keccak_text("not-approved")),
+            l1_owner,
+            l1_ethereum_tx,
+            multisig_transaction=None,
+        )
+        ambiguous_hash = to_0x_hex_str(fast_keccak_text("ambiguous"))
+        ambiguous_ethereum_tx = self._create_approve_hash(safe_address, ambiguous_hash)
+        self._create_approve_hash(
+            Account.create().address,
+            ambiguous_hash,
+            ethereum_tx=ambiguous_ethereum_tx,
+            trace_address="1",
+        )
+        ambiguous_approval = self._create_approval_without_safe_address(
+            ambiguous_hash, l1_owner, ambiguous_ethereum_tx, multisig_transaction=None
+        )
+        with factory.django.mute_signals(post_save):
+            eoa_confirmation = MultisigConfirmationFactory(
+                multisig_transaction=None,
+                ethereum_tx=l1_ethereum_tx,
+                safe_address=None,
+                signature_type=SafeSignatureType.EOA.value,
+            )
+
+        buf = StringIO()
+        call_command(
+            "backfill_multisig_confirmation_safe_address",
+            "--dry-run",
+            "--batch-size=2",
+            stdout=buf,
+        )
+        self.assertIn("Found 4 approvals without Safe address", buf.getvalue())
+        self.assertIn("Progress 4/4 filled=2 not_found=1 ambiguous=1", buf.getvalue())
+        self.assertFalse(
+            MultisigConfirmation.objects.exclude(safe_address=None).exists()
+        )
+
+        call_command(
+            "backfill_multisig_confirmation_safe_address",
+            "--batch-size=2",
+            stdout=StringIO(),
+        )
+        for multisig_confirmation, expected_safe_address in (
+            (l1_approval, safe_address),
+            (l2_approval, safe_address),
+            (not_found_approval, None),
+            (ambiguous_approval, None),
+            (eoa_confirmation, None),
+        ):
+            multisig_confirmation.refresh_from_db()
+            self.assertEqual(multisig_confirmation.safe_address, expected_safe_address)
+
+    @mock.patch.object(QueueService, "send_event")
+    def test_backfill_multisig_confirmation_safe_address_fixes_bindings(
+        self, send_event_mock: MagicMock
+    ):
+        """
+        After filling the Safe address: an unbound approval made on the Safe of a
+        stored transaction is bound and makes it trusted, an approval bound to a
+        transaction of another Safe is unbound, and a pending transaction left with
+        no valid confirmation is untrusted. Transactions with another valid
+        confirmation, proposed by a delegate or executed stay trusted. An approval
+        whose hash was approved on several Safes, none of them the transaction's, is
+        unbound too. The dry run reports the same changes as the real run
+        """
+        victim_safe = Account.create().address
+        other_safe = Account.create().address
+
+        def create_transaction(**kwargs) -> MultisigTransaction:
+            with factory.django.mute_signals(post_save):
+                return MultisigTransactionFactory(safe=victim_safe, **kwargs)
+
+        def approve_on(
+            approving_safe: str, approved_transaction: MultisigTransaction, **kwargs
+        ) -> MultisigConfirmation:
+            safe_tx_hash = to_0x_hex_str(HexBytes(approved_transaction.safe_tx_hash))
+            owner = Account.create().address
+            return self._create_approval_without_safe_address(
+                safe_tx_hash,
+                owner,
+                self._create_approve_hash(approving_safe, safe_tx_hash, owner=owner),
+                **kwargs,
+            )
+
+        never_bound_tx = create_transaction(ethereum_tx=None, trusted=False)
+        never_bound_approval = approve_on(
+            victim_safe, never_bound_tx, multisig_transaction=None
+        )
+        exploited_tx = create_transaction(ethereum_tx=None, trusted=True)
+        foreign_approval = approve_on(
+            other_safe, exploited_tx, multisig_transaction=exploited_tx
+        )
+        signed_tx = create_transaction(ethereum_tx=None, trusted=True)
+        approve_on(other_safe, signed_tx, multisig_transaction=signed_tx)
+        with factory.django.mute_signals(post_save):
+            MultisigConfirmationFactory(
+                multisig_transaction=signed_tx,
+                multisig_transaction_hash=signed_tx.safe_tx_hash,
+                signature_type=SafeSignatureType.EOA.value,
+            )
+        delegate_tx = create_transaction(
+            ethereum_tx=None,
+            trusted=True,
+            proposed_by_delegate=Account.create().address,
+        )
+        approve_on(other_safe, delegate_tx, multisig_transaction=delegate_tx)
+        executed_tx = create_transaction(trusted=True)
+        approve_on(other_safe, executed_tx, multisig_transaction=executed_tx)
+        # Also has a valid approval that was never bound
+        rescued_tx = create_transaction(ethereum_tx=None, trusted=True)
+        approve_on(other_safe, rescued_tx, multisig_transaction=rescued_tx)
+        approve_on(victim_safe, rescued_tx, multisig_transaction=None)
+        # Traces (L1) carry no owner: the hash approved on two other Safes in the
+        # same ethereum tx cannot be resolved to one Safe
+        ambiguous_tx = create_transaction(ethereum_tx=None, trusted=True)
+        ambiguous_hash = to_0x_hex_str(HexBytes(ambiguous_tx.safe_tx_hash))
+        ambiguous_ethereum_tx = self._create_approve_hash(other_safe, ambiguous_hash)
+        self._create_approve_hash(
+            Account.create().address,
+            ambiguous_hash,
+            ethereum_tx=ambiguous_ethereum_tx,
+            trace_address="1",
+        )
+        self._create_approval_without_safe_address(
+            ambiguous_hash,
+            Account.create().address,
+            ambiguous_ethereum_tx,
+            multisig_transaction=ambiguous_tx,
+        )
+
+        buf = StringIO()
+        call_command(
+            "backfill_multisig_confirmation_safe_address", "--dry-run", stdout=buf
+        )
+        self.assertIn(
+            "Would set Safe address on 7 confirmations, bind 2 confirmations, "
+            "unbind approvals from 6 transactions and untrust 2 transactions",
+            buf.getvalue(),
+        )
+        self.assertIn(
+            f"Untrusting safe-tx-hash={to_0x_hex_str(HexBytes(exploited_tx.safe_tx_hash))}",
+            buf.getvalue(),
+        )
+        self.assertIn(
+            f"Untrusting safe-tx-hash={ambiguous_hash}",
+            buf.getvalue(),
+        )
+        self.assertNotIn(
+            f"Untrusting safe-tx-hash={to_0x_hex_str(HexBytes(rescued_tx.safe_tx_hash))}",
+            buf.getvalue(),
+        )
+        exploited_tx.refresh_from_db()
+        self.assertTrue(exploited_tx.trusted)
+
+        buf = StringIO()
+        with self.captureOnCommitCallbacks(execute=True):
+            call_command("backfill_multisig_confirmation_safe_address", stdout=buf)
+        self.assertIn(
+            "Did set Safe address on 7 confirmations, bind 2 confirmations, "
+            "unbind approvals from 6 transactions and untrust 2 transactions",
+            buf.getvalue(),
+        )
+
+        never_bound_tx.refresh_from_db()
+        self.assertTrue(never_bound_tx.trusted)
+        bound_approval = MultisigConfirmation.objects.get(
+            multisig_transaction_hash=never_bound_tx.safe_tx_hash,
+            owner=never_bound_approval.owner,
+        )
+        self.assertEqual(
+            bound_approval.multisig_transaction_id, never_bound_tx.safe_tx_hash
+        )
+        self.assertEqual(bound_approval.created, never_bound_approval.created)
+        self.assertIn(
+            TransactionServiceEventType.PENDING_MULTISIG_TRANSACTION.name,
+            get_sent_event_types(send_event_mock),
+        )
+
+        foreign_approval.refresh_from_db()
+        self.assertIsNone(foreign_approval.multisig_transaction_id)
+        self.assertEqual(foreign_approval.safe_address, other_safe)
+        self.assertEqual(
+            MultisigConfirmation.objects.with_transaction()
+            .filter(signature_type=SafeSignatureType.APPROVED_HASH.value)
+            .exclude(safe_address=victim_safe)
+            .count(),
+            0,
+        )
+        for multisig_transaction, expected_trusted in (
+            (exploited_tx, False),
+            (signed_tx, True),
+            (delegate_tx, True),
+            (executed_tx, True),
+            (rescued_tx, True),
+            (ambiguous_tx, False),
+        ):
+            multisig_transaction.refresh_from_db()
+            self.assertEqual(multisig_transaction.trusted, expected_trusted)
+
+        # Running it again changes nothing
+        buf = StringIO()
+        call_command("backfill_multisig_confirmation_safe_address", stdout=buf)
+        self.assertIn(
+            "Did set Safe address on 0 confirmations, bind 0 confirmations, "
+            "unbind approvals from 0 transactions and untrust 0 transactions",
+            buf.getvalue(),
+        )
+
+    def test_backfill_multisig_confirmation_safe_address_keeps_new_confirmation(
+        self,
+    ):
+        """
+        A transaction that gets a real confirmation after it is selected to be
+        untrusted, but before it is written, stays trusted
+        """
+        safe_address = Account.create().address
+        with factory.django.mute_signals(post_save):
+            multisig_tx = MultisigTransactionFactory(
+                safe=safe_address, ethereum_tx=None, trusted=True
+            )
+        safe_tx_hash = to_0x_hex_str(HexBytes(multisig_tx.safe_tx_hash))
+        owner = Account.create().address
+        self._create_approval_without_safe_address(
+            safe_tx_hash,
+            owner,
+            self._create_approve_hash(
+                Account.create().address, safe_tx_hash, owner=owner
+            ),
+            multisig_transaction=multisig_tx,
+        )
+
+        class StdoutAddingConfirmation(StringIO):
+            """
+            Stores the owner's signature when the command reports the
+            transaction it is going to untrust, like a request served meanwhile
+            """
+
+            def write(self, text: str) -> int:
+                if text.startswith("Untrusting"):
+                    with factory.django.mute_signals(post_save):
+                        MultisigConfirmationFactory(
+                            multisig_transaction=multisig_tx,
+                            multisig_transaction_hash=multisig_tx.safe_tx_hash,
+                            signature_type=SafeSignatureType.EOA.value,
+                        )
+                return super().write(text)
+
+        buf = StdoutAddingConfirmation()
+        call_command(
+            "backfill_multisig_confirmation_safe_address", "--no-color", stdout=buf
+        )
+
+        self.assertIn(f"Untrusting safe-tx-hash={safe_tx_hash}", buf.getvalue())
+        self.assertIn(
+            "1 transactions got a confirmation while running and stay trusted",
+            buf.getvalue(),
+        )
+        self.assertIn("untrust 0 transactions", buf.getvalue())
+        multisig_tx.refresh_from_db()
+        self.assertTrue(multisig_tx.trusted)
+
     @mock.patch.object(EthereumClient, "get_network", autospec=True)
     def _test_setup_service(
         self,

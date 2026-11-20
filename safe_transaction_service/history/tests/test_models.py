@@ -6,10 +6,13 @@ from unittest import mock
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 from django.db.models import QuerySet
+from django.db.models.signals import post_save
 from django.test import TestCase
 from django.utils import timezone
 
+import factory
 from eth_account import Account
+from hexbytes import HexBytes
 from safe_eth.eth.utils import fast_keccak_text
 from safe_eth.safe.safe_signature import SafeSignatureType
 
@@ -64,48 +67,24 @@ class TestModelSignals(TestCase):
     def test_bind_confirmations(self):
         safe_tx_hash = fast_keccak_text("prueba")
         ethereum_tx = EthereumTxFactory()
+        safe_address = Account.create().address
         MultisigConfirmation.objects.create(
             ethereum_tx=ethereum_tx,
             multisig_transaction_hash=safe_tx_hash,
             owner=Account.create().address,
+            safe_address=safe_address,
             signature_type=SafeSignatureType.EOA.value,
         )
-        multisig_tx, _ = MultisigTransaction.objects.get_or_create(
-            safe_tx_hash=safe_tx_hash,
-            safe=Account.create().address,
-            ethereum_tx=None,
-            to=Account.create().address,
-            value=0,
-            data=None,
-            operation=0,
-            safe_tx_gas=100000,
-            base_gas=20000,
-            gas_price=1,
-            gas_token=None,
-            refund_receiver=None,
-            signatures=None,
-            nonce=0,
+        multisig_tx = MultisigTransactionFactory(
+            safe_tx_hash=safe_tx_hash, safe=safe_address, ethereum_tx=None
         )
         self.assertEqual(multisig_tx.confirmations.count(), 1)
 
     def test_bind_confirmations_reverse(self):
         safe_tx_hash = fast_keccak_text("prueba")
         ethereum_tx = EthereumTxFactory()
-        multisig_tx, _ = MultisigTransaction.objects.get_or_create(
-            safe_tx_hash=safe_tx_hash,
-            safe=Account.create().address,
-            ethereum_tx=None,
-            to=Account.create().address,
-            value=0,
-            data=None,
-            operation=0,
-            safe_tx_gas=100000,
-            base_gas=20000,
-            gas_price=1,
-            gas_token=None,
-            refund_receiver=None,
-            signatures=None,
-            nonce=0,
+        multisig_tx = MultisigTransactionFactory(
+            safe_tx_hash=safe_tx_hash, ethereum_tx=None
         )
         self.assertEqual(multisig_tx.confirmations.count(), 0)
 
@@ -113,6 +92,7 @@ class TestModelSignals(TestCase):
             ethereum_tx=ethereum_tx,
             multisig_transaction_hash=safe_tx_hash,
             owner=Account.create().address,
+            safe_address=multisig_tx.safe,
             signature_type=SafeSignatureType.EOA.value,
         )
         self.assertEqual(multisig_tx.confirmations.count(), 1)
@@ -1354,6 +1334,72 @@ class TestSafeContractDelegate(TestCase):
 
 
 class TestMultisigConfirmations(TestCase):
+    def test_get_or_create_for_transaction(self):
+        """
+        Unbound confirmations of the owners are replaced by new confirmations bound
+        to the transaction, whatever Safe they were made on. The transaction
+        becomes trusted
+        """
+        multisig_tx = MultisigTransactionFactory(ethereum_tx=None, trusted=False)
+        safe_tx_hash = multisig_tx.safe_tx_hash
+        defaults = {
+            "signature": HexBytes("0x" + "01" * 65),
+            "signature_type": SafeSignatureType.EOA.value,
+        }
+        with factory.django.mute_signals(post_save):
+            unbound_confirmations = [
+                MultisigConfirmationFactory(
+                    multisig_transaction=None,
+                    multisig_transaction_hash=safe_tx_hash,
+                    safe_address=stored_safe_address,
+                    signature_type=SafeSignatureType.APPROVED_HASH.value,
+                )
+                for stored_safe_address in (
+                    multisig_tx.safe,
+                    None,
+                    Account.create().address,
+                )
+            ]
+        owners = [Account.create().address] + [
+            unbound_confirmation.owner for unbound_confirmation in unbound_confirmations
+        ]
+
+        confirmations_and_created = (
+            MultisigConfirmation.objects.get_or_create_for_transaction(
+                multisig_tx, dict.fromkeys(owners, defaults)
+            )
+        )
+
+        self.assertEqual(
+            [created for _, created in confirmations_and_created], [True] * 4
+        )
+        for multisig_confirmation, _ in confirmations_and_created:
+            self.assertEqual(
+                multisig_confirmation.multisig_transaction_id, safe_tx_hash
+            )
+            self.assertEqual(multisig_confirmation.safe_address, multisig_tx.safe)
+            self.assertEqual(
+                multisig_confirmation.signature_type, SafeSignatureType.EOA.value
+            )
+        self.assertFalse(
+            MultisigConfirmation.objects.filter(
+                pk__in=[
+                    unbound_confirmation.pk
+                    for unbound_confirmation in unbound_confirmations
+                ]
+            ).exists()
+        )
+        multisig_tx.refresh_from_db()
+        self.assertTrue(multisig_tx.trusted)
+
+        # A bound confirmation is kept
+        self.assertEqual(
+            MultisigConfirmation.objects.get_or_create_for_transaction(
+                multisig_tx, {owners[0]: defaults}
+            ),
+            [(confirmations_and_created[0][0], False)],
+        )
+
     def test_remove_unused_confirmations(self):
         safe_address = Account.create().address
         owner_address = Account.create().address

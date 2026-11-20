@@ -142,6 +142,7 @@ class SafeMultisigConfirmationSerializer(serializers.Serializer):
                 raise ValidationError(f"Signature for owner={owner} is duplicated")
 
             signature_owners.append(owner)
+        self.multisig_transaction = multisig_transaction
         return signature
 
     def save(self, **kwargs):
@@ -149,16 +150,19 @@ class SafeMultisigConfirmationSerializer(serializers.Serializer):
         signature = self.validated_data["signature"]
         multisig_confirmations = []
         parsed_signatures = SafeSignature.parse_signature(signature, safe_tx_hash)
-        for safe_signature in parsed_signatures:
-            multisig_confirmation, created = MultisigConfirmation.objects.get_or_create(
-                multisig_transaction_hash=safe_tx_hash,
-                owner=safe_signature.owner,
-                defaults={
-                    "multisig_transaction_id": safe_tx_hash,
+        for (
+            multisig_confirmation,
+            created,
+        ) in MultisigConfirmation.objects.get_or_create_for_transaction(
+            self.multisig_transaction,
+            {
+                safe_signature.owner: {
                     "signature": safe_signature.export_signature(),
                     "signature_type": safe_signature.signature_type.value,
-                },
-            )
+                }
+                for safe_signature in parsed_signatures
+            },
+        ):
             logger.info(
                 f"Multisigconfirmation {'Created' if created else 'Updated'}",
                 extra={"extra_data": multisig_confirmation.to_dict()},
@@ -372,25 +376,26 @@ class SafeMultisigTransactionSerializer(SafeMultisigTxSerializer):
             },
         )
 
-        for safe_signature in self.validated_data.get("parsed_signatures"):
-            if safe_signature.owner in self.validated_data["safe_owners"]:
-                multisig_confirmation, created = (
-                    MultisigConfirmation.objects.get_or_create(
-                        multisig_transaction_hash=safe_tx_hash,
-                        owner=safe_signature.owner,
-                        defaults={
-                            "multisig_transaction": multisig_transaction,
-                            "signature": safe_signature.export_signature(),
-                            "signature_type": safe_signature.signature_type.value,
-                        },
-                    )
-                )
-                logger.info(
-                    f"MultisigConfirmation {'Created' if created else 'Updated'}",
-                    extra={
-                        "extra_data": multisig_confirmation.to_dict(),
-                    },
-                )
+        for (
+            multisig_confirmation,
+            created,
+        ) in MultisigConfirmation.objects.get_or_create_for_transaction(
+            multisig_transaction,
+            {
+                safe_signature.owner: {
+                    "signature": safe_signature.export_signature(),
+                    "signature_type": safe_signature.signature_type.value,
+                }
+                for safe_signature in self.validated_data.get("parsed_signatures")
+                if safe_signature.owner in self.validated_data["safe_owners"]
+            },
+        ):
+            logger.info(
+                f"MultisigConfirmation {'Created' if created else 'Updated'}",
+                extra={
+                    "extra_data": multisig_confirmation.to_dict(),
+                },
+            )
         return multisig_transaction
 
 

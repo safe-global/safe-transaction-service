@@ -1,16 +1,22 @@
+import copy
+import itertools
 import logging
 from unittest import mock
+from unittest.mock import MagicMock
 
 from django.test import TestCase
 
 from eth_account import Account
 from eth_utils import keccak
+from hexbytes import HexBytes
 from safe_eth.eth.ethereum_client import TracingManager
-from safe_eth.eth.utils import fast_keccak_text
+from safe_eth.eth.utils import fast_keccak_text, fast_to_checksum_address
+from safe_eth.safe import SafeTx
 from safe_eth.safe.safe_signature import SafeSignatureType
 from safe_eth.safe.tests.safe_test_case import SafeTestCaseMixin
 from safe_eth.util.util import to_0x_hex_str
 
+from safe_transaction_service.events.services.queue_service import QueueService
 from safe_transaction_service.safe_messages.models import SafeMessageConfirmation
 from safe_transaction_service.safe_messages.tests.factories import (
     SafeMessageConfirmationFactory,
@@ -33,6 +39,7 @@ from ..models import (
     SafeLastStatus,
     SafeRelevantTransaction,
     SafeStatus,
+    TransactionServiceEventType,
 )
 from .factories import (
     EthereumTxFactory,
@@ -44,6 +51,7 @@ from .factories import (
     SafeMasterCopyFactory,
 )
 from .mocks.traces import call_trace, module_traces, testnet_traces
+from .utils import get_sent_event_types
 
 logger = logging.getLogger(__name__)
 
@@ -398,6 +406,285 @@ class TestSafeTxProcessor(SafeTestCaseMixin, TestCase):
             multisig_confirmation.signature_type,
             SafeSignatureType.APPROVED_HASH.value,
         )
+        self.assertEqual(multisig_confirmation.safe_address, safe_address)
+
+    def _process_approve_hash(
+        self,
+        safe_address: str,
+        owner: str,
+        hash_to_approve: str,
+        is_indexed_from_traces: bool,
+    ) -> None:
+        """
+        Process an ``approveHash`` called by ``owner`` on ``safe_address``, built like
+        the L1 trace indexer (owner taken from the previous trace) or like the L2
+        event indexer (owner in the event arguments)
+        """
+        if is_indexed_from_traces:
+            approve_hash_decoded_tx = InternalTxDecodedFactory(
+                function_name="approveHash",
+                hash_to_approve=hash_to_approve,
+                internal_tx___from=safe_address,
+                internal_tx__trace_address="0,1,0",
+                internal_tx__value=0,
+            )
+            previous_call_trace = copy.deepcopy(call_trace)
+            previous_call_trace["action"]["from"] = owner
+            previous_call_trace["traceAddress"] = [0, 1]
+            with mock.patch.object(
+                TracingManager,
+                "trace_transaction",
+                autospec=True,
+                return_value=[previous_call_trace],
+            ):
+                self.tx_processor.process_decoded_transactions(
+                    [approve_hash_decoded_tx]
+                )
+        else:
+            self.tx_processor.process_decoded_transactions(
+                [
+                    InternalTxDecodedFactory(
+                        function_name="approveHash",
+                        arguments={"hashToApprove": hash_to_approve, "owner": owner},
+                        internal_tx___from=safe_address,
+                        internal_tx__value=0,
+                    )
+                ]
+            )
+
+    def _propose_and_approve_hash(
+        self,
+        tx_safe_address: str,
+        approving_safe_address: str,
+        owner: str,
+        is_indexed_from_traces: bool,
+        is_proposed_first: bool,
+    ) -> MultisigTransaction:
+        """
+        Store an untrusted proposal for ``tx_safe_address`` and process an
+        ``approveHash`` of its hash by ``owner`` on ``approving_safe_address``,
+        in the given order
+
+        :return: The proposal, read again from the database
+        """
+        safe_tx_hash = to_0x_hex_str(fast_keccak_text(approving_safe_address + owner))
+
+        def propose():
+            MultisigTransactionFactory(
+                safe_tx_hash=safe_tx_hash,
+                safe=tx_safe_address,
+                trusted=False,
+                ethereum_tx=None,
+            )
+
+        def approve_hash():
+            self._process_approve_hash(
+                approving_safe_address, owner, safe_tx_hash, is_indexed_from_traces
+            )
+
+        steps = (
+            [propose, approve_hash] if is_proposed_first else [approve_hash, propose]
+        )
+        with self.captureOnCommitCallbacks(execute=True):
+            for step in steps:
+                step()
+        return MultisigTransaction.objects.get(safe_tx_hash=safe_tx_hash)
+
+    @mock.patch.object(QueueService, "send_event")
+    def test_approve_hash_on_another_safe_does_not_trust_transaction(
+        self, send_event_mock: MagicMock
+    ):
+        """
+        ``approveHash`` called on Safe A with the hash of an untrusted proposal for
+        Safe B is not bound to the proposal, whatever arrives first and even if the
+        approving owner is an owner of B. The proposal stays untrusted and no
+        PENDING_MULTISIG_TRANSACTION is sent
+        """
+        for is_indexed_from_traces, is_proposed_first in itertools.product(
+            (True, False), repeat=2
+        ):
+            with self.subTest(
+                is_indexed_from_traces=is_indexed_from_traces,
+                is_proposed_first=is_proposed_first,
+            ):
+                send_event_mock.reset_mock()
+                # An L2 event can carry any owner, so use an owner of the victim Safe
+                victim_owner = Account.create().address
+                victim_safe_status = SafeLastStatusFactory(owners=[victim_owner])
+                attacker_safe_status = SafeLastStatusFactory(owners=[victim_owner])
+
+                multisig_tx = self._propose_and_approve_hash(
+                    victim_safe_status.address,
+                    attacker_safe_status.address,
+                    victim_owner,
+                    is_indexed_from_traces,
+                    is_proposed_first,
+                )
+
+                self.assertFalse(multisig_tx.trusted)
+                self.assertFalse(multisig_tx.confirmations.exists())
+                attacker_confirmation = MultisigConfirmation.objects.get(
+                    multisig_transaction_hash=multisig_tx.safe_tx_hash
+                )
+                self.assertIsNone(attacker_confirmation.multisig_transaction_id)
+                self.assertEqual(
+                    attacker_confirmation.safe_address, attacker_safe_status.address
+                )
+                sent_event_types = get_sent_event_types(send_event_mock)
+                self.assertNotIn(
+                    TransactionServiceEventType.PENDING_MULTISIG_TRANSACTION.name,
+                    sent_event_types,
+                )
+
+    @mock.patch.object(QueueService, "send_event")
+    def test_approve_hash_on_transaction_safe_trusts_transaction(
+        self, send_event_mock: MagicMock
+    ):
+        """
+        ``approveHash`` called on Safe B with the hash of an untrusted proposal for B
+        is bound to the proposal, which becomes trusted and is published, whatever
+        arrives first
+        """
+        for is_indexed_from_traces, is_proposed_first in itertools.product(
+            (True, False), repeat=2
+        ):
+            with self.subTest(
+                is_indexed_from_traces=is_indexed_from_traces,
+                is_proposed_first=is_proposed_first,
+            ):
+                send_event_mock.reset_mock()
+                owner = Account.create().address
+                safe_status = SafeLastStatusFactory(owners=[owner])
+
+                multisig_tx = self._propose_and_approve_hash(
+                    safe_status.address,
+                    safe_status.address,
+                    owner,
+                    is_indexed_from_traces,
+                    is_proposed_first,
+                )
+
+                self.assertTrue(multisig_tx.trusted)
+                self.assertEqual(
+                    list(multisig_tx.confirmations.values_list("owner", flat=True)),
+                    [owner],
+                )
+                sent_event_types = get_sent_event_types(send_event_mock)
+                # Not an exact count: `MultisigTransactionFactory` saves twice, and
+                # the second save publishes the trusted transaction again
+                self.assertIn(
+                    TransactionServiceEventType.PENDING_MULTISIG_TRANSACTION.name,
+                    sent_event_types,
+                )
+
+    def test_approve_hash_replaces_confirmation_made_on_another_safe(self):
+        """
+        A confirmation of the owner made on another Safe for the same hash does not
+        block the owner's ``approveHash`` on the transaction's Safe
+        """
+        owner = Account.create().address
+        safe_status = SafeLastStatusFactory(owners=[owner])
+        other_safe_status = SafeLastStatusFactory(owners=[owner])
+        multisig_tx = MultisigTransactionFactory(
+            safe=safe_status.address, trusted=False, ethereum_tx=None
+        )
+        safe_tx_hash = to_0x_hex_str(HexBytes(multisig_tx.safe_tx_hash))
+        self._process_approve_hash(
+            other_safe_status.address, owner, safe_tx_hash, False
+        )
+        self.assertFalse(multisig_tx.confirmations.exists())
+
+        self._process_approve_hash(safe_status.address, owner, safe_tx_hash, False)
+
+        multisig_confirmation = MultisigConfirmation.objects.get(
+            multisig_transaction_hash=safe_tx_hash, owner=owner
+        )
+        self.assertEqual(multisig_confirmation.safe_address, safe_status.address)
+        self.assertEqual(multisig_confirmation.multisig_transaction_id, safe_tx_hash)
+        multisig_tx.refresh_from_db()
+        self.assertTrue(multisig_tx.trusted)
+
+    def test_approve_hash_links_ethereum_tx_only_for_transaction_safe(self):
+        """
+        An ``approveHash`` links its ethereum tx to an existing confirmation of the
+        owner only when it is made on the transaction's Safe
+        """
+        owner = Account.create().address
+        safe_status = SafeLastStatusFactory(owners=[owner])
+        other_safe_status = SafeLastStatusFactory(owners=[owner])
+        multisig_tx = MultisigTransactionFactory(
+            safe=safe_status.address, ethereum_tx=None
+        )
+        safe_tx_hash = to_0x_hex_str(HexBytes(multisig_tx.safe_tx_hash))
+        [(multisig_confirmation, _)] = (
+            MultisigConfirmation.objects.get_or_create_for_transaction(
+                multisig_tx,
+                {
+                    owner: {
+                        "signature": HexBytes("0x" + "01" * 65),
+                        "signature_type": SafeSignatureType.EOA.value,
+                    }
+                },
+            )
+        )
+
+        self._process_approve_hash(
+            other_safe_status.address, owner, safe_tx_hash, False
+        )
+        multisig_confirmation.refresh_from_db()
+        self.assertIsNone(multisig_confirmation.ethereum_tx_id)
+
+        self._process_approve_hash(safe_status.address, owner, safe_tx_hash, False)
+        multisig_confirmation.refresh_from_db()
+        self.assertIsNotNone(multisig_confirmation.ethereum_tx_id)
+
+    def test_exec_transaction_replaces_confirmation_made_on_another_safe(self):
+        """
+        A confirmation of a signer made on another Safe for the executed hash is
+        replaced by the confirmation of the execution signature
+        """
+        exec_decoded_tx = InternalTxDecodedFactory(
+            function_name="execTransaction", internal_tx__value=0
+        )
+        exec_arguments = exec_decoded_tx.arguments
+        # The default `execTransaction` signature is an approved hash of this owner
+        signer = fast_to_checksum_address("0x2d8d6cafa6b8b7eed96c3711734d24df40c121e7")
+        safe_status = SafeLastStatusFactory(
+            address=exec_decoded_tx.internal_tx._from, owners=[signer], nonce=0
+        )
+        safe_tx_hash = to_0x_hex_str(
+            SafeTx(
+                None,
+                safe_status.address,
+                exec_arguments["to"],
+                exec_arguments["value"],
+                exec_arguments["data"],
+                exec_arguments["operation"],
+                exec_arguments["safeTxGas"],
+                exec_arguments["baseGas"],
+                exec_arguments["gasPrice"],
+                exec_arguments["gasToken"],
+                exec_arguments["refundReceiver"],
+                safe_nonce=0,
+                safe_version=self.tx_processor.get_safe_version_from_master_copy(
+                    safe_status.master_copy
+                )
+                or "1.3.0",
+                chain_id=self.ethereum_client.get_chain_id(),
+            ).safe_tx_hash
+        )
+        other_safe_address = Account.create().address
+        SafeLastStatusFactory(address=other_safe_address, owners=[signer])
+        self._process_approve_hash(other_safe_address, signer, safe_tx_hash, False)
+
+        self.tx_processor.process_decoded_transactions([exec_decoded_tx])
+
+        multisig_confirmation = MultisigConfirmation.objects.get(
+            multisig_transaction_hash=safe_tx_hash, owner=signer
+        )
+        self.assertEqual(multisig_confirmation.multisig_transaction_id, safe_tx_hash)
+        self.assertEqual(multisig_confirmation.safe_address, safe_status.address)
+        self.assertIsNone(multisig_confirmation.ethereum_tx_id)
 
     def test_tx_processor_is_failed(self):
         tx_processor = self.tx_processor

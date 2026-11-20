@@ -1,5 +1,6 @@
 import functools
 import os
+from unittest.mock import MagicMock
 
 import pytest
 import requests
@@ -56,3 +57,11 @@ def skip_on(exception, reason="Test skipped due to a controlled exception"):
         return wrapper
 
     return decorator_func
+
+
+def get_sent_event_types(send_event_mock: MagicMock) -> list[str]:
+    """
+    :param send_event_mock: Mock of ``QueueService.send_event``
+    :return: Types of every event sent through the mock
+    """
+    return [call.args[0]["type"] for call in send_event_mock.call_args_list]

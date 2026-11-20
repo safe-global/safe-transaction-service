@@ -1,7 +1,10 @@
 from abc import ABC, abstractmethod
+from unittest import mock
+from unittest.mock import MagicMock
 
 from django.test import TestCase
 
+import eth_abi
 from eth_account import Account
 from eth_typing import ChecksumAddress
 from hexbytes import HexBytes
@@ -11,6 +14,7 @@ from safe_eth.eth.contracts import (
     get_safe_V1_4_1_contract,
     get_safe_V1_5_0_contract,
 )
+from safe_eth.eth.utils import fast_keccak_text
 from safe_eth.safe import Safe
 from safe_eth.safe.tests.safe_test_case import SafeTestCaseMixin
 from safe_eth.util.util import to_0x_hex_str
@@ -19,6 +23,7 @@ from web3.auto import w3
 from web3.datastructures import AttributeDict
 from web3.types import LogReceipt
 
+from ...events.services.queue_service import QueueService
 from ..indexers import SafeEventsIndexer, SafeEventsIndexerProvider
 from ..indexers.tx_processor import SafeTxProcessor
 from ..models import (
@@ -32,13 +37,21 @@ from ..models import (
     SafeContract,
     SafeLastStatus,
     SafeStatus,
+    TransactionServiceEventType,
 )
-from .factories import EthereumBlockFactory, EthereumTxFactory, SafeMasterCopyFactory
+from .factories import (
+    EthereumBlockFactory,
+    EthereumTxFactory,
+    MultisigTransactionFactory,
+    SafeLastStatusFactory,
+    SafeMasterCopyFactory,
+)
 from .mocks.mocks_safe_events_indexer import (
     proxy_creation_event_mock,
     safe_events_mock,
     setup_events_mock,
 )
+from .utils import get_sent_event_types
 
 
 class SafeEventsIndexerBaseAbstractTestBase(SafeTestCaseMixin, TestCase, ABC):
@@ -1585,3 +1598,105 @@ class TestSafeEventsIndexerV1_3_0(SafeEventsIndexerBaseAbstractTestBase):
         :return: Last Safe Contract available
         """
         return get_safe_V1_3_0_contract(w3, address=address)
+
+
+class TestSafeEventsIndexerApproveHashFromFakeSafe(SafeTestCaseMixin, TestCase):
+    @staticmethod
+    def _build_emit_log_code(topics: list[bytes], data: bytes) -> bytes:
+        """
+        :return: EVM code that emits one log with ``topics`` and ``data``
+        """
+        push32 = b"\x7f"
+        mstore = b"\x52"
+        padded_data = data + b"\x00" * (-len(data) % 32)
+        code = b""
+        for offset in range(0, len(padded_data), 32):
+            code += push32 + padded_data[offset : offset + 32]
+            code += push32 + offset.to_bytes(32, "big") + mstore
+        for topic in reversed(topics):
+            code += push32 + topic.rjust(32, b"\x00")
+        code += push32 + len(data).to_bytes(32, "big")
+        code += push32 + (0).to_bytes(32, "big")
+        log_opcode = bytes([0xA0 + len(topics)])
+        return code + log_opcode
+
+    @mock.patch.object(QueueService, "send_event")
+    def test_approve_hash_event_from_fake_safe_does_not_trust_transaction(
+        self, send_event_mock: MagicMock
+    ):
+        """
+        A contract that is not a Safe emits ``SafeSetup`` and then ``ApproveHash``
+        with the hash of a proposal for a real Safe and one of its owners. The
+        indexer stores the approval for the fake Safe, and the proposal stays
+        untrusted
+        """
+        victim_owner = Account.create().address
+        victim_safe_status = SafeLastStatusFactory(owners=[victim_owner])
+        safe_tx_hash = to_0x_hex_str(fast_keccak_text(victim_owner))
+        MultisigTransactionFactory(
+            safe_tx_hash=safe_tx_hash,
+            safe=victim_safe_status.address,
+            trusted=False,
+            ethereum_tx=None,
+        )
+
+        safe_events_indexer = SafeEventsIndexer(
+            self.ethereum_client, confirmations=0, blocks_to_reindex_again=0
+        )
+        safe_events_indexer.start()
+        attacker = self.ethereum_test_account
+        safe_setup_data = eth_abi.encode(
+            ["address[]", "uint256", "address", "address"],
+            [[attacker.address], 1, NULL_ADDRESS, NULL_ADDRESS],
+        )
+        fake_safe_constructor = (
+            self._build_emit_log_code(
+                [
+                    fast_keccak_text(
+                        "SafeSetup(address,address[],uint256,address,address)"
+                    ),
+                    HexBytes(attacker.address),
+                ],
+                safe_setup_data,
+            )
+            + self._build_emit_log_code(
+                [
+                    fast_keccak_text("ApproveHash(bytes32,address)"),
+                    HexBytes(safe_tx_hash),
+                    HexBytes(victim_owner),
+                ],
+                b"",
+            )
+            + b"\x00"  # STOP
+        )
+        tx_hash = self.send_tx({"data": fake_safe_constructor}, attacker)
+        tx_receipt = self.wait_for_receipt(tx_hash)
+        fake_safe_address = tx_receipt["contractAddress"]
+
+        block_number = tx_receipt["blockNumber"]
+        safe_events_indexer.process_elements(
+            safe_events_indexer.find_relevant_elements(
+                set(), block_number, block_number
+            )
+        )
+        with self.captureOnCommitCallbacks(execute=True):
+            SafeTxProcessor(
+                self.ethereum_client, None, None
+            ).process_decoded_transactions(
+                list(InternalTxDecoded.objects.pending_for_safes())
+            )
+
+        approve_hash_confirmation = MultisigConfirmation.objects.get(
+            multisig_transaction_hash=safe_tx_hash
+        )
+        self.assertEqual(approve_hash_confirmation.owner, victim_owner)
+        self.assertEqual(approve_hash_confirmation.safe_address, fake_safe_address)
+        self.assertIsNone(approve_hash_confirmation.multisig_transaction_id)
+        self.assertFalse(
+            MultisigTransaction.objects.get(safe_tx_hash=safe_tx_hash).trusted
+        )
+        sent_event_types = get_sent_event_types(send_event_mock)
+        self.assertNotIn(
+            TransactionServiceEventType.PENDING_MULTISIG_TRANSACTION.name,
+            sent_event_types,
+        )

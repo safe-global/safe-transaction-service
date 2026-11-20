@@ -61,11 +61,9 @@ def bind_confirmation(
         return None
 
     if sender == MultisigTransaction:
-        updated = (
-            MultisigConfirmation.objects.without_transaction()
-            .filter(multisig_transaction_hash=instance.safe_tx_hash)
-            .update(multisig_transaction=instance)
-        )
+        updated = MultisigConfirmation.objects.bindable_to_transaction(
+            instance.safe_tx_hash, instance.safe
+        ).update(multisig_transaction=instance)
         if updated:
             # Update modified on MultisigTransaction if at least one confirmation is added. Tx will now be trusted
             instance.modified = timezone.now()
@@ -79,9 +77,10 @@ def bind_confirmation(
             ).update(modified=instance.created, trusted=True)
         else:
             try:
-                if instance.multisig_transaction_hash:
+                if instance.multisig_transaction_hash and instance.safe_address:
                     multisig_transaction = MultisigTransaction.objects.get(
-                        safe_tx_hash=instance.multisig_transaction_hash
+                        safe_tx_hash=instance.multisig_transaction_hash,
+                        safe=instance.safe_address,
                     )
                     multisig_transaction.modified = instance.created
                     multisig_transaction.trusted = True
