@@ -60,7 +60,8 @@ class IgnoreVersionSchemaGenerator(SchemaGenerator):
             dict: The generated OpenAPI schema with updated paths if a prefix is found.
         """
         schema = super().get_schema(request=request, public=public)
-        prefix = request.META.get("HTTP_X_FORWARDED_PREFIX", "")
+        # `manage.py spectacular` generates the schema without a request
+        prefix = request.META.get("HTTP_X_FORWARDED_PREFIX", "") if request else ""
         logging.info(f"prefix: {prefix}")
 
         if prefix:
