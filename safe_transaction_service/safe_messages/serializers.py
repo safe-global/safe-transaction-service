@@ -102,10 +102,10 @@ class SafeMessageSerializer(SafeMessageSignatureParserMixin, serializers.Seriali
                 return value
             except ValueError as exc:
                 raise ValidationError(
-                    f"Provided dictionary is not a valid EIP712 message {value}"
+                    "Provided dictionary is not a valid EIP712 message"
                 ) from exc
 
-        raise ValidationError(f"Provided value is not a valid message {value}")
+        raise ValidationError("Provided value is not a valid message")
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
