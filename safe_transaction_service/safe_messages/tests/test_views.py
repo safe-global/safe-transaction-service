@@ -470,6 +470,42 @@ class TestMessageViews(SafeTestCaseMixin, APITestCase):
         self.assertGreater(safe_message.modified, safe_message_modified)
         self.assertEqual(safe_message_confirmation.modified, safe_message.modified)
 
+    def test_safe_messages_create_invalid_message_view(self):
+        """
+        An invalid message gets a 400, and the error does not repeat the message.
+        """
+        safe_address = Account.create().address
+        nested_message: dict = {}
+        for _ in range(1_000):
+            nested_message = {"next": nested_message}
+        invalid_eip712_message = {
+            "types": {
+                "EIP712Domain": [{"name": "name", "type": "string"}],
+                "Node": [{"name": "next", "type": "Node"}],
+            },
+            "primaryType": "Node",
+            "domain": {"name": "Test"},
+            "message": nested_message,
+        }
+        for message, expected_error in (
+            (
+                invalid_eip712_message,
+                "Provided dictionary is not a valid EIP712 message",
+            ),
+            (["Text to sign message"], "Provided value is not a valid message"),
+        ):
+            with self.subTest(expected_error=expected_error):
+                response = self.client.post(
+                    reverse("v1:safe_messages:safe-messages", args=(safe_address,)),
+                    format="json",
+                    data={"message": message, "signature": "0x" + "1" * 130},
+                )
+                self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+                self.assertEqual(
+                    response.data,
+                    {"message": [ErrorDetail(string=expected_error, code="invalid")]},
+                )
+
     def test_safe_messages_list_view(self):
         safe_address = Account.create().address
         response = self.client.get(
