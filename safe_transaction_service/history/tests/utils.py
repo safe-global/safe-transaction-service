@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: FSL-1.1-MIT
 import functools
 import os
+from unittest.mock import MagicMock
 
 import pytest
 import requests
@@ -57,3 +58,15 @@ def skip_on(exception, reason="Test skipped due to a controlled exception"):
         return wrapper
 
     return decorator_func
+
+
+def get_sent_event_types(send_events_mock: MagicMock) -> list[str]:
+    """
+    :param send_events_mock: Mock of ``QueueService.send_events``
+    :return: Types of every event sent through the mock
+    """
+    return [
+        payload["type"]
+        for call in send_events_mock.call_args_list
+        for payload in call.args[0]
+    ]

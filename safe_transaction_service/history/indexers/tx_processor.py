@@ -10,6 +10,7 @@ from collections.abc import Sequence
 from typing import Any
 
 from django.db import transaction
+from django.db.models import Exists
 
 from eth_typing import ChecksumAddress, HexStr
 from eth_utils import event_abi_to_log_topic
@@ -781,6 +782,18 @@ class SafeTxProcessor(TxProcessor):
                 safe_signature = SafeSignatureApprovedHash.build_for_owner(
                     owner, multisig_transaction_hash
                 )
+                # The approval is made on the transaction's Safe, so it replaces any
+                # unbound confirmation of the owner that holds its place
+                MultisigConfirmation.objects.without_transaction().filter(
+                    Exists(
+                        MultisigTransaction.objects.filter(
+                            safe_tx_hash=multisig_transaction_hash,
+                            safe=contract_address,
+                        )
+                    ),
+                    multisig_transaction_hash=multisig_transaction_hash,
+                    owner=owner,
+                ).delete()
                 (multisig_confirmation, _) = MultisigConfirmation.objects.get_or_create(
                     multisig_transaction_hash=multisig_transaction_hash,
                     owner=owner,
@@ -789,13 +802,14 @@ class SafeTxProcessor(TxProcessor):
                         "ethereum_tx": ethereum_tx,
                         "signature": safe_signature.export_signature(),
                         "signature_type": safe_signature.signature_type.value,
-                        # Stored without the `MultisigTransaction` FK, and the transaction
-                        # may not exist in this service, so the event payload and the view
-                        # cache take the Safe from the contract being indexed
                         "safe_address": contract_address,
                     },
                 )
-                if not multisig_confirmation.ethereum_tx_id:
+                if (
+                    not multisig_confirmation.ethereum_tx_id
+                    and multisig_confirmation.safe_address_or_transaction_safe
+                    == contract_address
+                ):
                     multisig_confirmation.ethereum_tx = ethereum_tx
                     multisig_confirmation.save(update_fields=["ethereum_tx"])
             elif function_name == "execTransaction":
@@ -892,28 +906,35 @@ class SafeTxProcessor(TxProcessor):
                         ]
                     )
 
-                for safe_signature in SafeSignature.parse_signature(
-                    safe_tx.signatures, safe_tx_hash
-                ):
-                    exported_signature = safe_signature.export_signature()
-                    (
-                        multisig_confirmation,
-                        _,
-                    ) = MultisigConfirmation.objects.get_or_create(
-                        multisig_transaction_hash=safe_tx_hash,
-                        owner=safe_signature.owner,
-                        defaults={
-                            "created": internal_tx.timestamp,
-                            "ethereum_tx": None,
-                            "multisig_transaction": multisig_tx,
-                            "signature": exported_signature,
-                            "signature_type": safe_signature.signature_type.value,
-                        },
+                confirmation_defaults_by_owner = {
+                    safe_signature.owner: {
+                        "created": internal_tx.timestamp,
+                        "ethereum_tx": None,
+                        "signature": safe_signature.export_signature(),
+                        "signature_type": safe_signature.signature_type.value,
+                    }
+                    for safe_signature in SafeSignature.parse_signature(
+                        safe_tx.signatures, safe_tx_hash
                     )
-                    if HexBytes(multisig_confirmation.signature) != exported_signature:
-                        multisig_confirmation.signature = exported_signature
+                }
+                for (
+                    multisig_confirmation,
+                    _,
+                ) in MultisigConfirmation.objects.get_or_create_for_transaction(
+                    multisig_tx, confirmation_defaults_by_owner
+                ):
+                    executed_confirmation_fields = confirmation_defaults_by_owner[
+                        multisig_confirmation.owner
+                    ]
+                    if (
+                        HexBytes(multisig_confirmation.signature)
+                        != executed_confirmation_fields["signature"]
+                    ):
+                        multisig_confirmation.signature = executed_confirmation_fields[
+                            "signature"
+                        ]
                         multisig_confirmation.signature_type = (
-                            safe_signature.signature_type.value
+                            executed_confirmation_fields["signature_type"]
                         )
                         multisig_confirmation.save(
                             update_fields=["signature", "signature_type"]

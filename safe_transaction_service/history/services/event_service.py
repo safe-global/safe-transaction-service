@@ -146,7 +146,9 @@ def build_event_payload(
     :return: A list of messages generated from the instance provided
     """
     payloads: list[dict[str, Any]] = []
-    if sender == MultisigConfirmation and (safe_address := instance.safe_address):
+    if sender == MultisigConfirmation and (
+        safe_address := instance.safe_address_or_transaction_safe
+    ):
         payloads = [
             {
                 # `created` is the block timestamp for on-chain approvals and the

@@ -482,6 +482,7 @@ class TestSignals(SafeTestCaseMixin, TestCase):
         process_event signal handler emits PENDING_MULTISIG_TRANSACTION.
         """
         known_hash = to_0x_hex_str(fast_keccak_text("bind-test-tx-pending-event"))
+        safe_address = Account.create().address
 
         # Create the confirmation before the transaction exists (unlinked).
         # Mute signals so this creation doesn't interfere with the mock state.
@@ -489,6 +490,7 @@ class TestSignals(SafeTestCaseMixin, TestCase):
             MultisigConfirmationFactory(
                 multisig_transaction=None,
                 multisig_transaction_hash=known_hash,
+                safe_address=safe_address,
             )
         send_events_mock.assert_not_called()
 
@@ -497,7 +499,10 @@ class TestSignals(SafeTestCaseMixin, TestCase):
         # in-memory instance so process_event can emit the notification.
         with self.captureOnCommitCallbacks(execute=True):
             MultisigTransactionFactory(
-                trusted=False, ethereum_tx=None, safe_tx_hash=known_hash
+                trusted=False,
+                ethereum_tx=None,
+                safe_tx_hash=known_hash,
+                safe=safe_address,
             )
 
         self.assertIn(

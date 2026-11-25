@@ -1919,6 +1919,39 @@ class MultisigConfirmationManager(models.Manager):
             owner=owner,
         ).delete()[0]
 
+    def get_or_create_for_transaction(
+        self,
+        multisig_transaction: MultisigTransaction,
+        defaults_by_owner: dict[ChecksumAddress, dict[str, Any]],
+    ) -> list[tuple[MultisigConfirmation, bool]]:
+        """
+        Confirmations are unique by hash and owner, and an ``approveHash`` of the
+        hash can be indexed from any contract with any owner. Unbound confirmations
+        of the owners are replaced, so they cannot hold the place of the owners'
+        confirmations.
+
+        :param multisig_transaction: Transaction confirmed by the owners
+        :param defaults_by_owner: Fields for a new confirmation of each owner
+        :return: Confirmation of each owner bound to ``multisig_transaction``, and
+            whether it was created
+        """
+        self.without_transaction().filter(
+            multisig_transaction_hash=multisig_transaction.safe_tx_hash,
+            owner__in=defaults_by_owner,
+        ).delete()
+        return [
+            self.get_or_create(
+                multisig_transaction_hash=multisig_transaction.safe_tx_hash,
+                owner=owner,
+                defaults={
+                    **defaults,
+                    "multisig_transaction": multisig_transaction,
+                    "safe_address": multisig_transaction.safe,
+                },
+            )
+            for owner, defaults in defaults_by_owner.items()
+        ]
+
 
 class MultisigConfirmationQuerySet(models.QuerySet):
     def without_transaction(self):
@@ -1926,6 +1959,20 @@ class MultisigConfirmationQuerySet(models.QuerySet):
 
     def with_transaction(self):
         return self.exclude(multisig_transaction=None)
+
+    def bindable_to_transaction(
+        self, safe_tx_hash: bytes | str, safe_address: ChecksumAddress | Subquery
+    ):
+        """
+        :param safe_tx_hash: Hash of the transaction
+        :param safe_address: Safe of the transaction, or a subquery returning it
+        :return: Confirmations of ``safe_tx_hash`` with no transaction yet that were
+            made on ``safe_address``. The hash alone is not enough, as ``approveHash``
+            can be called on any Safe for any hash
+        """
+        return self.without_transaction().filter(
+            multisig_transaction_hash=safe_tx_hash, safe_address=safe_address
+        )
 
 
 class MultisigConfirmation(TimeStampedModel):
@@ -1948,6 +1995,9 @@ class MultisigConfirmation(TimeStampedModel):
     # Covered by the unique (multisig_transaction_hash, owner) index
     multisig_transaction_hash = Keccak256Field(null=True)
     owner = EthereumAddressBinaryField()
+    # Safe the confirmation was made on. For an indexed `approveHash` it is the
+    # contract that was called (traces) or that emitted the event
+    safe_address = EthereumAddressBinaryField(null=True)
 
     signature = HexV2Field(null=True, default=None, max_length=MAX_SIGNATURE_LENGTH)
     signature_type = models.PositiveSmallIntegerField(
@@ -1963,28 +2013,18 @@ class MultisigConfirmation(TimeStampedModel):
         ]
         ordering = ["created"]
 
-    # Transient (non-DB) Safe address, set through the `safe_address` property. The
-    # indexer sets it for confirmations built from an on-chain `approveHash`: those are
-    # stored with `multisig_transaction_hash` only, and the transaction may not exist in
-    # this service at all, so the Safe cannot be resolved from the FK.
-    _safe_address: ChecksumAddress | None = None
-
     @property
-    def safe_address(self) -> ChecksumAddress | None:
+    def safe_address_or_transaction_safe(self) -> ChecksumAddress | None:
         """
-        :return: Safe this confirmation belongs to, preferring the address set by the
-            indexer and falling back to the `MultisigTransaction`, or `None` when neither
-            is available
+        :return: Safe the confirmation was made on. Confirmations stored without it
+            take the Safe of their `MultisigTransaction`. `None` when neither is
+            available
         """
-        if self._safe_address:
-            return self._safe_address
+        if self.safe_address:
+            return self.safe_address
         if self.multisig_transaction_id:
             return self.multisig_transaction.safe  # This could make a db call
         return None
-
-    @safe_address.setter
-    def safe_address(self, safe_address: ChecksumAddress) -> None:
-        self._safe_address = safe_address
 
     def __str__(self):
         if self.multisig_transaction_id:

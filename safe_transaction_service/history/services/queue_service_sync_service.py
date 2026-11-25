@@ -431,10 +431,22 @@ class QueueServiceSyncService:
                 ignore_conflicts=True,
             )
             # Link the confirmations stored before the transaction
-            MultisigConfirmation.objects.without_transaction().filter(
-                multisig_transaction_hash=safe_tx_hash
+            MultisigConfirmation.objects.bindable_to_transaction(
+                safe_tx_hash, tx_data["safe"]
             ).update(multisig_transaction_id=safe_tx_hash)
 
+        # On-chain approvals are stored by the indexer
+        queue_confirmation_by_owner = {
+            fast_to_checksum_address(confirmation["owner"]): confirmation
+            for confirmation in tx_data["confirmations"]
+            if confirmation["signatureType"] != SafeSignatureType.APPROVED_HASH.name
+        }
+        # Unbound confirmations are unique by hash and owner too, and would hold the
+        # place of the owners' confirmations
+        MultisigConfirmation.objects.without_transaction().filter(
+            multisig_transaction_hash=safe_tx_hash,
+            owner__in=queue_confirmation_by_owner,
+        ).delete()
         existing_owners = set(
             MultisigConfirmation.objects.filter(
                 multisig_transaction_hash=safe_tx_hash
@@ -444,12 +456,11 @@ class QueueServiceSyncService:
             MultisigConfirmation(
                 multisig_transaction_id=safe_tx_hash,
                 multisig_transaction_hash=safe_tx_hash,
+                safe_address=tx_data["safe"],
                 **build_confirmation_fields(confirmation),
             )
-            for confirmation in tx_data["confirmations"]
-            # On-chain approvals are stored by the indexer
-            if confirmation["signatureType"] != SafeSignatureType.APPROVED_HASH.name
-            and fast_to_checksum_address(confirmation["owner"]) not in existing_owners
+            for owner, confirmation in queue_confirmation_by_owner.items()
+            if owner not in existing_owners
         ]
         if new_confirmations:
             MultisigConfirmation.objects.bulk_create(

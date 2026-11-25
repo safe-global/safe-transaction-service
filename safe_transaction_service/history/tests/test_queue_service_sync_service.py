@@ -309,6 +309,7 @@ class TestQueueServiceSyncService(TestCase):
         confirmation = MultisigConfirmationFactory(
             multisig_transaction=None,
             multisig_transaction_hash=tx_data["safeTxHash"],
+            safe_address=tx_data["safe"],
         )
         self.queue_service_client.get_multisig_transaction.return_value = tx_data
         self.sync_service.sync_multisig_transaction(tx_data)
@@ -316,6 +317,55 @@ class TestQueueServiceSyncService(TestCase):
         confirmation.refresh_from_db()
         self.assertEqual(confirmation.multisig_transaction_id, tx_data["safeTxHash"])
         self.assertEqual(MultisigConfirmation.objects.count(), 2)
+
+    def test_sync_multisig_transaction_does_not_link_confirmation_of_another_safe(
+        self,
+    ):
+        """
+        A confirmation stored before the transaction is not linked to it when it was
+        made on another Safe
+        """
+        tx_data = build_multisig_transaction_data(confirmations=[])
+        other_safe_confirmation = MultisigConfirmationFactory(
+            multisig_transaction=None,
+            multisig_transaction_hash=tx_data["safeTxHash"],
+            safe_address=Account.create().address,
+        )
+        self.queue_service_client.get_multisig_transaction.return_value = tx_data
+        self.sync_service.sync_multisig_transaction(tx_data)
+
+        other_safe_confirmation.refresh_from_db()
+        self.assertIsNone(other_safe_confirmation.multisig_transaction_id)
+
+    def test_sync_multisig_transaction_replaces_confirmation_of_another_safe(self):
+        """
+        An unbound confirmation made on another Safe does not block the owner's
+        confirmation from the Queue Service
+        """
+        owner = Account.create().address
+        tx_data = build_multisig_transaction_data(
+            confirmations=[build_confirmation_data(owner=owner)]
+        )
+        MultisigConfirmationFactory(
+            multisig_transaction=None,
+            multisig_transaction_hash=tx_data["safeTxHash"],
+            owner=owner,
+            safe_address=Account.create().address,
+            signature_type=SafeSignatureType.APPROVED_HASH.value,
+        )
+        self.queue_service_client.get_multisig_transaction.return_value = tx_data
+        self.sync_service.sync_multisig_transaction(tx_data)
+
+        multisig_confirmation = MultisigConfirmation.objects.get(
+            multisig_transaction_hash=tx_data["safeTxHash"], owner=owner
+        )
+        self.assertEqual(
+            multisig_confirmation.multisig_transaction_id, tx_data["safeTxHash"]
+        )
+        self.assertEqual(multisig_confirmation.safe_address, tx_data["safe"])
+        self.assertEqual(
+            multisig_confirmation.signature_type, SafeSignatureType.EOA.value
+        )
 
     def test_sync_existing_multisig_transaction(self):
         # Only the missing confirmations are added, the transaction is not updated

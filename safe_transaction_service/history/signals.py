@@ -3,7 +3,7 @@
 from logging import getLogger
 
 from django.conf import settings
-from django.db.models import Model
+from django.db.models import Model, Subquery
 from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 from django.utils import timezone
@@ -66,11 +66,9 @@ def bind_confirmation(
         return None
 
     if sender == MultisigTransaction:
-        updated = (
-            MultisigConfirmation.objects.without_transaction()
-            .filter(multisig_transaction_hash=instance.safe_tx_hash)
-            .update(multisig_transaction=instance)
-        )
+        updated = MultisigConfirmation.objects.bindable_to_transaction(
+            instance.safe_tx_hash, instance.safe
+        ).update(multisig_transaction=instance)
         if updated:
             # Update modified on MultisigTransaction if at least one confirmation is added. Tx will now be trusted
             now = timezone.now()
@@ -91,6 +89,17 @@ def bind_confirmation(
         multisig_tx_queryset = MultisigTransaction.objects.filter(
             safe_tx_hash=safe_tx_hash
         )
+        if not instance.multisig_transaction_id:
+            is_bound = (
+                MultisigConfirmation.objects.filter(pk=instance.pk)
+                .bindable_to_transaction(
+                    safe_tx_hash, Subquery(multisig_tx_queryset.values("safe")[:1])
+                )
+                .update(multisig_transaction_id=safe_tx_hash)
+            )
+            if not is_bound:
+                return None
+
         # Only the first confirmation flips `trusted`, so the conditional update
         # tells whether this confirmation is the one making the tx trusted
         became_trusted = bool(
@@ -100,15 +109,6 @@ def bind_confirmation(
         )
         if not became_trusted:
             multisig_tx_queryset.update(modified=instance.created)
-
-        if not instance.multisig_transaction_id:
-            # Use a subquery so the FK update only runs if the MultisigTransaction
-            # exists, regardless of whether the previous update changed any values
-            MultisigConfirmation.objects.filter(pk=instance.pk).filter(
-                multisig_transaction_hash__in=multisig_tx_queryset.values(
-                    "safe_tx_hash"
-                )
-            ).update(multisig_transaction_id=safe_tx_hash)
 
         if became_trusted and (
             multisig_tx := multisig_tx_queryset.not_executed().first()
