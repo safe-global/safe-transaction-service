@@ -26,7 +26,6 @@ RUN apt-get update \
     && chown python:python /nginx
 
 ENV PYTHONUNBUFFERED=1 \
-    ETH_HASH_BACKEND=pysha3 \
     GUNICORN_CMD_ARGS=--no-control-socket \
     PATH="/app/.venv/bin:${PATH}"
 WORKDIR /app
