@@ -779,6 +779,9 @@ SPECTACULAR_SETTINGS = {
     "DESCRIPTION": "API to keep track of transactions sent via Safe smart contracts",
     "VERSION": __version__,
     "SWAGGER_UI_FAVICON_HREF": "static/safe/favicon.png",
+    # Redoc 3 bundles are ES modules, which drf-spectacular 0.30 cannot load (blank
+    # page, tfranzel/drf-spectacular#1543). Drop the pin when a release fixes it.
+    "REDOC_DIST": "https://cdn.jsdelivr.net/npm/redoc@2.5.4",
     "OAS_VERSION": "3.1.0",
     "SERVE_INCLUDE_SCHEMA": False,
     "SCHEMA_PATH_PREFIX": "/api/v[0-9]",
