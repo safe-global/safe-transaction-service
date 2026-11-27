@@ -3,7 +3,7 @@ import dataclasses
 import datetime
 import json
 import logging
-from unittest.mock import ANY, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 from django.test import TestCase
 from django.utils import timezone
@@ -14,7 +14,7 @@ from hexbytes import HexBytes
 from safe_transaction_service.events.services import QueueService
 
 from ...utils.redis import get_redis
-from ...utils.tasks import WORKER_STOPPED
+from ...utils.tasks import is_worker_stopping
 from ..indexers import (
     Erc20EventsIndexerProvider,
     FindRelevantElementsException,
@@ -192,6 +192,40 @@ class TestTasks(TestCase):
     def test_index_safe_events_task(self):
         self.assertEqual(index_safe_events_task.delay().result, (0, 0))
 
+    def test_indexing_tasks_pass_worker_stopping_check(self):
+        """
+        Indexing tasks pass `is_worker_stopping` to the indexer as `should_stop`
+        """
+        for task, indexer_provider_name in (
+            (index_erc20_events_task, "Erc20EventsIndexerProvider"),
+            (index_internal_txs_task, "InternalTxIndexerProvider"),
+            (index_new_proxies_task, "ProxyFactoryIndexerProvider"),
+            (index_safe_events_task, "SafeEventsIndexerProvider"),
+        ):
+            with self.subTest(task=task.name):
+                with patch(
+                    f"safe_transaction_service.history.tasks.{indexer_provider_name}"
+                ) as indexer_provider_mock:
+                    indexer_start_mock = indexer_provider_mock.return_value.start
+                    indexer_start_mock.return_value = (0, 0)
+                    task.delay()
+                    indexer_start_mock.assert_called_once_with(
+                        should_stop=is_worker_stopping
+                    )
+
+    @patch.object(IndexService, "process_all_decoded_txs", return_value=0)
+    def test_process_decoded_internal_txs_task_together_passes_worker_stopping_check(
+        self, process_all_decoded_txs_mock: MagicMock
+    ):
+        """
+        Processing every Safe together passes `is_worker_stopping` as `should_stop`
+        """
+        with self.settings(PROCESSING_ALL_SAFES_TOGETHER=True):
+            process_decoded_internal_txs_task.delay()
+        process_all_decoded_txs_mock.assert_called_once_with(
+            should_stop=is_worker_stopping
+        )
+
     @patch.object(IndexService, "get_master_copies_indexing_status")
     @patch.object(IndexService, "reindex_master_copies")
     def test_reindex_mastercopies_last_hours_task(
@@ -335,7 +369,9 @@ class TestTasks(TestCase):
                 IndexService, "process_decoded_txs_for_safe", return_value=5
             ) as process_decoded_txs_mock:
                 process_decoded_internal_txs_for_safe_task.delay(safe_address)
-                process_decoded_txs_mock.assert_called_with(safe_address)
+                process_decoded_txs_mock.assert_called_with(
+                    safe_address, should_stop=is_worker_stopping
+                )
                 self.assertIn(
                     f"[{safe_address}] Start processing decoded internal txs",
                     cm.output[0],
@@ -490,12 +526,5 @@ class TestTasks(TestCase):
             self.assertEqual(sync_from_queue_service_task.delay().result, 3)
         sync_mock.assert_called_once_with(
             time_limit_seconds=QUEUE_SERVICE_SYNC_TIME_LIMIT_SECONDS,
-            should_stop=ANY,
+            should_stop=is_worker_stopping,
         )
-        should_stop = sync_mock.call_args.kwargs["should_stop"]
-        self.assertFalse(should_stop())
-        WORKER_STOPPED.add(True)
-        try:
-            self.assertTrue(should_stop())
-        finally:
-            WORKER_STOPPED.discard(True)

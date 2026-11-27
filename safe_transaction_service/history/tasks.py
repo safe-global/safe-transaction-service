@@ -20,7 +20,7 @@ from safe_transaction_service.utils.redis import get_redis
 
 from ..events.services.queue_service import get_queue_service
 from ..utils.celery import task_timeout
-from ..utils.tasks import LOCK_TIMEOUT, WORKER_STOPPED, only_one_running_task
+from ..utils.tasks import LOCK_TIMEOUT, is_worker_stopping, only_one_running_task
 from .indexers import (
     Erc20EventsIndexerProvider,
     FindRelevantElementsException,
@@ -114,7 +114,7 @@ def index_erc20_events_task(self) -> tuple[int, int] | None:
             (
                 number_events,
                 number_of_blocks_processed,
-            ) = Erc20EventsIndexerProvider().start()
+            ) = Erc20EventsIndexerProvider().start(should_stop=is_worker_stopping)
             logger.debug(
                 "Indexing of erc20/721 events task processed %d events", number_events
             )
@@ -221,7 +221,7 @@ def index_internal_txs_task(self) -> tuple[int, int] | None:
             (
                 number_traces,
                 number_of_blocks_processed,
-            ) = InternalTxIndexerProvider().start()
+            ) = InternalTxIndexerProvider().start(should_stop=is_worker_stopping)
             logger.info("Find internal txs task processed %d traces", number_traces)
             if number_traces:
                 logger.info("Calling task to process decoded traces")
@@ -246,7 +246,7 @@ def index_new_proxies_task(self) -> tuple[int, int] | None:
             (
                 number_proxies,
                 number_of_blocks_processed,
-            ) = ProxyFactoryIndexerProvider().start()
+            ) = ProxyFactoryIndexerProvider().start(should_stop=is_worker_stopping)
             logger.info("Proxy indexing found %d proxies", number_proxies)
             return number_proxies, number_of_blocks_processed
 
@@ -267,7 +267,9 @@ def index_safe_events_task(self) -> tuple[int, int] | None:
     with contextlib.suppress(LockError):
         with only_one_running_task(self):
             logger.info("Start indexing of Safe events")
-            number, number_of_blocks_processed = SafeEventsIndexerProvider().start()
+            number, number_of_blocks_processed = SafeEventsIndexerProvider().start(
+                should_stop=is_worker_stopping
+            )
             logger.info("Find Safe events processed %d events", number)
             if number:
                 logger.info("Calling task to process decoded traces")
@@ -286,7 +288,9 @@ def process_decoded_internal_txs_task(self) -> int | None:
                     "Start process decoded internal txs for every Safe together"
                 )
                 index_service = IndexServiceProvider()
-                return index_service.process_all_decoded_txs()
+                return index_service.process_all_decoded_txs(
+                    should_stop=is_worker_stopping
+                )
             else:
                 # We need to process Safes individually
                 logger.info(
@@ -326,7 +330,9 @@ def process_decoded_internal_txs_for_safe_task(
         with only_one_running_task(self, lock_name_suffix=safe_address):
             logger.info("[%s] Start processing decoded internal txs", safe_address)
             index_service: IndexService = IndexServiceProvider()
-            number_processed = index_service.process_decoded_txs_for_safe(safe_address)
+            number_processed = index_service.process_decoded_txs_for_safe(
+                safe_address, should_stop=is_worker_stopping
+            )
             logger.info(
                 "[%s] Processed %d decoded transactions", safe_address, number_processed
             )
@@ -580,8 +586,7 @@ def sync_from_queue_service_task(self) -> int | None:
     so it expires fast and runs are not accumulated when workers are busy. Each
     run keeps reading the queue for ``QUEUE_SERVICE_SYNC_TIME_LIMIT_SECONDS``,
     also when it is empty. It stops taking new events when the worker is
-    shutting down, as the lock is released then and another worker could start
-    reading the queue.
+    shutting down, so the worker does not wait for the time limit to stop.
 
     :return: Number of messages consumed
     """
@@ -591,7 +596,7 @@ def sync_from_queue_service_task(self) -> int | None:
         with only_one_running_task(self):
             return get_queue_service_sync_service().sync(
                 time_limit_seconds=QUEUE_SERVICE_SYNC_TIME_LIMIT_SECONDS,
-                should_stop=lambda: bool(WORKER_STOPPED),
+                should_stop=is_worker_stopping,
             )
     return None
 

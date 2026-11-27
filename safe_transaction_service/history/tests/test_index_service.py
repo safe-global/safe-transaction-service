@@ -378,6 +378,30 @@ class TestIndexService(EthereumTestCaseMixin, TestCase):
             multisig_tx.refresh_from_db()
             self.assertIsNotNone(multisig_tx.ethereum_tx_id)
 
+    def test_process_decoded_txs_stops_when_should_stop(self):
+        """
+        Decoded transactions stay pending when processing is asked to stop
+        """
+        internal_tx_decoded = InternalTxDecodedFactory(function_name="setup")
+        safe_address = internal_tx_decoded.internal_tx._from
+        self.assertEqual(
+            self.index_service.process_decoded_txs_for_safe(
+                safe_address, should_stop=lambda: True
+            ),
+            0,
+        )
+        self.assertEqual(
+            self.index_service.process_all_decoded_txs(should_stop=lambda: True), 0
+        )
+        internal_tx_decoded.refresh_from_db()
+        self.assertFalse(internal_tx_decoded.processed)
+
+        self.assertEqual(
+            self.index_service.process_decoded_txs_for_safe(safe_address), 1
+        )
+        internal_tx_decoded.refresh_from_db()
+        self.assertTrue(internal_tx_decoded.processed)
+
     def test_fix_out_of_order_late_exec_transaction(self):
         """
         An `execTransaction` indexed after newer ones were processed (e.g. a trace

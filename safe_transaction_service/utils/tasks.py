@@ -4,7 +4,6 @@ from typing import Any
 
 from django.conf import settings
 
-import gevent
 from celery.app.task import Task as CeleryTask
 from celery.signals import worker_shutdown, worker_shutting_down
 from celery.utils.log import get_task_logger
@@ -16,31 +15,22 @@ from .redis import get_redis
 logger = get_task_logger(__name__)
 
 LOCK_TIMEOUT = settings.CELERY_TASK_LOCK_TIMEOUT
-ACTIVE_LOCKS: set[str] = set()  # Active redis locks, release them when worker stops
 WORKER_STOPPED = set()  # Worker status
+
+
+def is_worker_stopping() -> bool:
+    return bool(WORKER_STOPPED)
 
 
 @worker_shutting_down.connect
 def worker_shutting_down_handler(sig, how, exitcode, **kwargs):
     logger.warning("Worker shutting down")
-    gevent.spawn(
-        release_locks_on_worker_shutdown
-    )  # If not raises a `BlockingSwitchOutError`
+    WORKER_STOPPED.add(True)
 
 
 @worker_shutdown.connect
 def worker_shutdown_handler(**kwargs: Any) -> None:
     close_queue_service()
-
-
-def release_locks_on_worker_shutdown():
-    WORKER_STOPPED.add(True)
-    if ACTIVE_LOCKS:
-        logger.warning("Force releasing of redis locks %s", ACTIVE_LOCKS)
-        get_redis().delete(*ACTIVE_LOCKS)
-        logger.warning("Released redis locks")
-    else:
-        logger.warning("No redis locks to release")
 
 
 def get_task_lock_name(task_name: str, lock_name_suffix: str | None = None) -> str:
@@ -67,13 +57,9 @@ def only_one_running_task(
     :return: Instance of redis `Lock`
     :raises: LockError if lock cannot be acquired
     """
-    if WORKER_STOPPED:
+    if is_worker_stopping():
         raise LockError("Worker is stopping")
     redis = get_redis()
     lock_name = get_task_lock_name(task.name, lock_name_suffix=lock_name_suffix)
     with redis.lock(lock_name, blocking=False, timeout=lock_timeout) as lock:
-        ACTIVE_LOCKS.add(lock_name)
-        try:
-            yield lock
-        finally:
-            ACTIVE_LOCKS.discard(lock_name)
+        yield lock
