@@ -1,5 +1,5 @@
 # Dependabot only updates image versions in FROM lines
-FROM ghcr.io/astral-sh/uv:0.13.7 AS uv
+FROM ghcr.io/astral-sh/uv:0.13.10 AS uv
 
 FROM python:3.14.10-slim AS prod-deps
 COPY --from=uv /uv /usr/local/bin/uv
