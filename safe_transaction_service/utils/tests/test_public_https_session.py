@@ -214,6 +214,7 @@ class TestPublicHttpsSession(SimpleTestCase):
         """
         certificate_authority = trustme.CA()
         server_ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+        server_ssl_context.minimum_version = ssl.TLSVersion.TLSv1_2
         certificate_authority.issue_cert("127.0.0.1").configure_cert(server_ssl_context)
         server = ThreadingHTTPServer(("127.0.0.1", 0), RedirectHandler)
         server.socket = server_ssl_context.wrap_socket(server.socket, server_side=True)
