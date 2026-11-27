@@ -7,7 +7,7 @@ import operator
 import random
 from collections.abc import Sequence
 from typing import Any
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 
 from django.conf import settings
 from django.core.cache import cache as django_cache
@@ -26,6 +26,10 @@ from safe_transaction_service.tokens.constants import (
     ENS_CONTRACTS_WITH_TLD,
 )
 from safe_transaction_service.tokens.models import Token
+from safe_transaction_service.utils.public_https_session import (
+    NonPublicAddressError,
+    build_public_https_session,
+)
 from safe_transaction_service.utils.redis import get_redis
 from safe_transaction_service.utils.utils import chunks
 
@@ -157,11 +161,15 @@ class CollectiblesService:
         60 * 60 * 24 * 2
     )  # Keep collectibles by 2 days in cache
     TOKEN_EXPIRATION = int(60 * 60)
+    METADATA_MAX_REDIRECTS = 3
 
     def __init__(self, ethereum_client: EthereumClient, redis: Redis):
         self.ethereum_client = ethereum_client
         self.ethereum_network = ethereum_client.get_network()
         self.redis = redis
+        self.metadata_https_session = build_public_https_session(
+            max_redirects=self.METADATA_MAX_REDIRECTS
+        )
 
         base_url = settings.ENS_SUBGRAPH_URL
         api_key = settings.ENS_SUBGRAPH_API_KEY
@@ -228,9 +236,9 @@ class CollectiblesService:
 
     def _retrieve_metadata_from_uri(self, uri: str) -> Any:
         """
-        Get metadata from URI. IPFS, HTTP/S, and BASE64/JSON are supported
+        Get metadata from URI. IPFS, HTTPS, and BASE64/JSON are supported
 
-        :param uri: Metadata URI, like http://example.org/token/3 or ipfs://<keccak256>
+        :param uri: Metadata URI, like https://example.org/token/3 or ipfs://<keccak256>
         :return: Metadata as a decoded json
         """
         if not uri:
@@ -242,12 +250,14 @@ class CollectiblesService:
 
         uri = ipfs_to_http(uri)
 
-        if not uri.startswith("http"):
+        if urlparse(uri).scheme != "https":
             raise MetadataRetrievalException(uri)
 
         try:
             logger.debug("Getting metadata for uri=%s", uri)
-            with requests.get(uri, timeout=10, stream=True) as response:
+            with self.metadata_https_session.get(
+                uri, timeout=10, stream=True
+            ) as response:
                 if not response.ok:
                     logger.debug("Cannot get metadata for uri=%s", uri)
                     raise MetadataRetrievalException(uri)
@@ -274,6 +284,12 @@ class CollectiblesService:
                     )
 
                 return response.json()
+        except (
+            NonPublicAddressError,
+            requests.TooManyRedirects,
+            requests.exceptions.InvalidSchema,
+        ) as e:
+            raise MetadataRetrievalException(f"{uri}: {e}") from e
         except (OSError, ValueError) as e:
             raise MetadataRetrievalExceptionTimeout(uri) from e
 

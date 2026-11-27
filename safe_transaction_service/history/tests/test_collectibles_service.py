@@ -6,6 +6,7 @@ from unittest.mock import MagicMock
 from django.conf import settings
 from django.test import TestCase
 
+import requests
 from eth_account import Account
 from safe_eth.eth import EthereumNetwork
 from safe_eth.eth.ethereum_client import (
@@ -19,6 +20,7 @@ from safe_eth.eth.tests.ethereum_test_case import EthereumTestCaseMixin
 from safe_transaction_service.tokens.constants import ENS_CONTRACTS_WITH_TLD
 from safe_transaction_service.tokens.models import Token
 from safe_transaction_service.tokens.tests.factories import TokenFactory
+from safe_transaction_service.utils.public_https_session import NonPublicAddressError
 from safe_transaction_service.utils.redis import get_redis
 
 from ..services import CollectiblesService
@@ -431,6 +433,37 @@ class TestCollectiblesService(EthereumTestCaseMixin, TestCase):
         uri = "data:application/json;base64,eyJ0b2tlbiI6"
         with self.assertRaisesMessage(MetadataRetrievalException, uri):
             collectibles_service._retrieve_metadata_from_uri(uri)
+
+    def test_retrieve_metadata_from_rejected_uri(self):
+        """Internal targets and schemes other than https fail as not retryable."""
+        collectibles_service = CollectiblesServiceProvider()
+        for uri in (
+            "https://169.254.169.254/latest/meta-data/",
+            "http://example.com/token/1",
+            "ftp://example.com/token/1",
+            "file:///etc/passwd",
+        ):
+            with self.subTest(uri=uri):
+                with self.assertRaises(MetadataRetrievalException):
+                    collectibles_service._retrieve_metadata_from_uri(uri)
+
+    def test_retrieve_metadata_from_uri_not_retryable_request_errors(self):
+        """Rejected targets, redirects to other schemes and too many redirects are not retried."""
+        collectibles_service = CollectiblesServiceProvider()
+        uri = "https://metadata.example.com/token/1"
+        for request_error in (
+            NonPublicAddressError,
+            requests.TooManyRedirects,
+            requests.exceptions.InvalidSchema,
+        ):
+            with self.subTest(request_error=request_error):
+                with mock.patch.object(
+                    collectibles_service.metadata_https_session,
+                    "get",
+                    side_effect=request_error,
+                ):
+                    with self.assertRaises(MetadataRetrievalException):
+                        collectibles_service._retrieve_metadata_from_uri(uri)
 
     @mock.patch(
         "safe_transaction_service.history.services.collectibles_service.CollectiblesService._retrieve_metadata_from_uri"

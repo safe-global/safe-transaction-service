@@ -45,6 +45,7 @@ from .services import (
 from .services.collectibles_service import (
     Collectible,
     CollectibleWithMetadata,
+    MetadataRetrievalException,
     MetadataRetrievalExceptionTimeout,
 )
 from .services.event_service import build_reorg_payload
@@ -555,6 +556,9 @@ def retry_get_metadata_task(
                 collectible.uri,
                 retry_get_metadata_task.request.retries,
             )
+        return None
+    except MetadataRetrievalException:
+        logger.debug("Cannot retrieve metadata from %s", collectible.uri)
         return None
     return collectible_with_metadata
 
