@@ -40,7 +40,7 @@ from django.db.models.expressions import (
     Value,
     When,
 )
-from django.db.models.functions import Coalesce
+from django.db.models.functions import Coalesce, Greatest
 from django.db.models.query import RawQuerySet
 from django.db.models.signals import Signal
 from django.utils import timezone
@@ -219,14 +219,29 @@ class IndexingStatusManager(models.Manager):
         """
 
         :param block_number:
-        :param from_block_number: If provided, only update the field if bigger than `from_block_number`, to protect
-                                  from reorgs
-        :return:
+        :param from_block_number: If provided, only update the field if it is `>= from_block_number`, to protect
+                                  from reorgs, and never move it backwards, as indexing runs can overlap
+        :return: `False` if a reorg was detected, `True` otherwise, also when `block_number` is kept because
+                 it was already higher
         """
         queryset = self.filter(indexing_type=IndexingStatusType.ERC20_721_EVENTS.value)
-        if from_block_number is not None:
-            queryset = queryset.filter(block_number__gte=from_block_number)
-        return bool(queryset.update(block_number=block_number))
+        if from_block_number is None:
+            return bool(queryset.update(block_number=block_number))
+        return bool(
+            queryset.filter(block_number__gte=from_block_number).update(
+                block_number=Greatest(F("block_number"), block_number)
+            )
+        )
+
+    def rewind_erc20_721_indexing_status(self, block_number: int) -> int:
+        """
+        :param block_number:
+        :return: Number of rows rewound, `0` if the indexing block number was not higher than `block_number`
+        """
+        return self.filter(
+            indexing_type=IndexingStatusType.ERC20_721_EVENTS.value,
+            block_number__gt=block_number,
+        ).update(block_number=block_number)
 
 
 class IndexingStatus(models.Model):

@@ -168,6 +168,50 @@ class TestIndexingStatus(TestCase):
             IndexingStatus.objects.get_erc20_721_indexing_status().block_number, 10
         )
 
+    def test_set_erc20_721_indexing_status_never_moves_backwards(self):
+        """
+        Two overlapping indexing runs start from the same block. The run that
+        scanned a smaller range finishes last and must not move the indexing
+        block number backwards.
+        """
+        start_block_number = 1_000
+        IndexingStatus.objects.set_erc20_721_indexing_status(start_block_number)
+
+        # Run A scans [1_000, 2_999] and finishes first
+        self.assertTrue(
+            IndexingStatus.objects.set_erc20_721_indexing_status(
+                3_000, from_block_number=start_block_number
+            )
+        )
+        # Run B scans [1_000, 1_049] and finishes later. It is not a reorg, so
+        # the update is reported as done, but the block number is kept
+        self.assertTrue(
+            IndexingStatus.objects.set_erc20_721_indexing_status(
+                1_050, from_block_number=start_block_number
+            )
+        )
+        self.assertEqual(
+            IndexingStatus.objects.get_erc20_721_indexing_status().block_number,
+            3_000,
+        )
+
+    def test_rewind_erc20_721_indexing_status(self):
+        """
+        Rewind moves the indexing block number backwards, but never forwards.
+        """
+        IndexingStatus.objects.set_erc20_721_indexing_status(100)
+
+        self.assertEqual(IndexingStatus.objects.rewind_erc20_721_indexing_status(50), 1)
+        self.assertEqual(
+            IndexingStatus.objects.get_erc20_721_indexing_status().block_number, 50
+        )
+
+        self.assertEqual(IndexingStatus.objects.rewind_erc20_721_indexing_status(50), 0)
+        self.assertEqual(IndexingStatus.objects.rewind_erc20_721_indexing_status(80), 0)
+        self.assertEqual(
+            IndexingStatus.objects.get_erc20_721_indexing_status().block_number, 50
+        )
+
 
 class TestMultisigTransaction(TestCase):
     def test_data_should_be_decoded(self):
