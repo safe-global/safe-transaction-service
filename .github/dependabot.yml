@@ -12,6 +12,11 @@ updates:
       semver-major-days: 30
       semver-minor-days: 7
       semver-patch-days: 7
+    ignore:
+      # Celery 5.7.0 gevent workers stop consuming with a startup backlog (#3115)
+      # and are capped at ~10 messages/s by `_quick_drain` in `synloop`.
+      - dependency-name: "celery"
+        versions: [">=5.7.0"]
     groups:
       django:
         patterns:
