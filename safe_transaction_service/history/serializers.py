@@ -506,6 +506,13 @@ class DelegateSerializerMixin:
                     "More than one signatures detected, just one is expected"
                 )
             safe_signature = safe_signatures[0]
+            # An approved hash is checked by calling its owner as a Safe,
+            # so it cannot sign a delegate message
+            if safe_signature.signature_type == SafeSignatureType.APPROVED_HASH:
+                raise ValidationError(
+                    "Approved hash signatures are not supported for delegates (v = 1). "
+                    "Use an ECDSA signature with v = 27 or 28"
+                )
             owner = safe_signature.owner
 
             if safe_signature.is_valid(ethereum_client, owner):
@@ -1292,6 +1299,11 @@ class DelegateSignatureCheckerMixin:
             )
 
         safe_signature = safe_signatures[0]
+        if safe_signature.signature_type == SafeSignatureType.APPROVED_HASH:
+            raise ValidationError(
+                "Approved hash signatures are not supported for delegates (v = 1). "
+                "Use an ECDSA signature with v = 27 or 28"
+            )
         owner = safe_signature.owner
         if owner == delegator:
             if not safe_signature.is_valid(ethereum_client, owner):
