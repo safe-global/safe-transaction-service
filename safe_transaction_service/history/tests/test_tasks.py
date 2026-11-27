@@ -14,7 +14,12 @@ from hexbytes import HexBytes
 from safe_transaction_service.events.services import QueueService
 
 from ...utils.redis import get_redis
-from ...utils.tasks import WORKER_STOPPED
+from ...utils.tasks import (
+    ACTIVE_LOCKS,
+    LOCK_TIMEOUT,
+    WORKER_STOPPED,
+    get_task_lock_name,
+)
 from ..indexers import (
     Erc20EventsIndexerProvider,
     FindRelevantElementsException,
@@ -42,6 +47,7 @@ from ..tasks import (
     check_reorgs_task,
     check_sync_status_task,
     delete_expired_delegates_task,
+    get_safe_processing_queued_key,
     index_erc20_events_out_of_sync_task,
     index_erc20_events_task,
     index_internal_txs_task,
@@ -302,6 +308,116 @@ class TestTasks(TestCase):
                     "Start process decoded internal txs for every Safe in a different task",
                     cm.output[0],
                 )
+
+    def test_process_decoded_internal_txs_task_skips_queued_safes(self):
+        internal_tx_decoded = InternalTxDecodedFactory(function_name="setup")
+        safe_address = internal_tx_decoded.internal_tx._from
+        queued_key = get_safe_processing_queued_key(safe_address)
+        redis = get_redis()
+        self.addCleanup(redis.delete, queued_key)
+        with self.settings(PROCESSING_ALL_SAFES_TOGETHER=False):
+            with patch.object(
+                process_decoded_internal_txs_for_safe_task, "delay"
+            ) as delay_mock:
+                # Safe is queued the first time
+                self.assertEqual(process_decoded_internal_txs_task(), 1)
+                delay_mock.assert_called_once_with(
+                    safe_address, reindex_master_copies=True
+                )
+                self.assertTrue(redis.exists(queued_key))
+
+                # Task for the Safe is still in the queue, don't queue it again
+                self.assertEqual(process_decoded_internal_txs_task(), 0)
+                delay_mock.assert_called_once()
+
+            # Safe is being processed by other task, it's still not queued again
+            with redis.lock(
+                get_task_lock_name(
+                    process_decoded_internal_txs_for_safe_task.name,
+                    lock_name_suffix=safe_address,
+                )
+            ):
+                self.assertIsNone(
+                    process_decoded_internal_txs_for_safe_task(safe_address)
+                )
+            self.assertTrue(redis.exists(queued_key))
+
+            # That lock could belong to a killed worker, key cannot outlive it
+            redis.set(queued_key, 1, ex=LOCK_TIMEOUT * 4)
+            with redis.lock(
+                get_task_lock_name(
+                    process_decoded_internal_txs_for_safe_task.name,
+                    lock_name_suffix=safe_address,
+                )
+            ):
+                process_decoded_internal_txs_for_safe_task(safe_address)
+            self.assertLessEqual(redis.ttl(queued_key), LOCK_TIMEOUT)
+
+            # Safe is kept as queued while it's being processed
+            with patch.object(
+                IndexService,
+                "process_decoded_txs_for_safe",
+                side_effect=lambda _: redis.exists(queued_key),
+            ):
+                self.assertEqual(
+                    process_decoded_internal_txs_for_safe_task(safe_address), 1
+                )
+
+            # Once the Safe is processed it can be queued again
+            self.assertFalse(redis.exists(queued_key))
+            with patch.object(
+                process_decoded_internal_txs_for_safe_task, "delay"
+            ) as delay_mock:
+                self.assertEqual(process_decoded_internal_txs_task(), 1)
+                delay_mock.assert_called_once()
+
+            # Processing fails, Safe can be queued again
+            redis.set(queued_key, 1)
+            with patch.object(
+                IndexService, "process_decoded_txs_for_safe", side_effect=ValueError
+            ):
+                with self.assertRaises(ValueError):
+                    process_decoded_internal_txs_for_safe_task(safe_address)
+            self.assertFalse(redis.exists(queued_key))
+            self.assertNotIn(queued_key, ACTIVE_LOCKS)
+
+            # Check is disabled, Safe is always queued
+            redis.set(queued_key, 1)
+            with self.settings(PROCESSING_SAFE_QUEUED_EXPIRATION_SECONDS=0):
+                with patch.object(
+                    process_decoded_internal_txs_for_safe_task, "delay"
+                ) as delay_mock:
+                    self.assertEqual(process_decoded_internal_txs_task(), 1)
+                    delay_mock.assert_called_once()
+
+            # Task could not be queued, Safe can be queued again
+            redis.delete(queued_key)
+            with patch.object(
+                process_decoded_internal_txs_for_safe_task,
+                "delay",
+                side_effect=OSError,
+            ):
+                with self.assertRaises(OSError):
+                    process_decoded_internal_txs_task()
+            self.assertFalse(redis.exists(queued_key))
+
+            # Task not run because worker is stopping, Safe can be queued again
+            redis.set(queued_key, 1)
+            WORKER_STOPPED.add(True)
+            self.addCleanup(WORKER_STOPPED.clear)
+            self.assertIsNone(process_decoded_internal_txs_for_safe_task(safe_address))
+            self.assertFalse(redis.exists(queued_key))
+
+            # But not if other worker is processing the Safe
+            redis.set(queued_key, 1)
+            with redis.lock(
+                get_task_lock_name(
+                    process_decoded_internal_txs_for_safe_task.name,
+                    lock_name_suffix=safe_address,
+                )
+            ):
+                process_decoded_internal_txs_for_safe_task(safe_address)
+            self.assertTrue(redis.exists(queued_key))
 
     def test_process_decoded_internal_txs_for_banned_safe(self):
         owner = Account.create().address

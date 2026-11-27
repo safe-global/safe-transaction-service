@@ -676,6 +676,9 @@ PROCESSING_ENABLE_OUT_OF_ORDER_CHECK = env.bool(
 PROCESSING_ALL_SAFES_TOGETHER = env.bool(
     "PROCESSING_ALL_SAFES_TOGETHER", default=False
 )  # Process every Safe together in the same task. More optimal, but one problematic Safe can stuck the others
+PROCESSING_SAFE_QUEUED_EXPIRATION_SECONDS = max(
+    env.int("PROCESSING_SAFE_QUEUED_EXPIRATION_SECONDS", default=60 * 15), 0
+)  # Time a Safe can be waiting in the processing queue before being queued again. Queue is transient, so if the task is lost Safe will not be queued again until this time passes. `0` to always queue every pending Safe
 
 
 # Tokens

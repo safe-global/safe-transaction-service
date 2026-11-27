@@ -13,14 +13,20 @@ from celery import app
 from celery.utils.log import get_task_logger
 from eth_typing import ChecksumAddress
 from hexbytes import HexBytes
-from redis.exceptions import LockError
+from redis.exceptions import LockError, RedisError
 from safe_eth.eth.utils import fast_to_checksum_address
 
 from safe_transaction_service.utils.redis import get_redis
 
 from ..events.services.queue_service import get_queue_service
 from ..utils.celery import task_timeout
-from ..utils.tasks import LOCK_TIMEOUT, WORKER_STOPPED, only_one_running_task
+from ..utils.tasks import (
+    ACTIVE_LOCKS,
+    LOCK_TIMEOUT,
+    WORKER_STOPPED,
+    get_task_lock_name,
+    only_one_running_task,
+)
 from .indexers import (
     Erc20EventsIndexerProvider,
     FindRelevantElementsException,
@@ -275,6 +281,15 @@ def index_safe_events_task(self) -> tuple[int, int] | None:
             return number, number_of_blocks_processed
 
 
+def get_safe_processing_queued_key(safe_address: ChecksumAddress) -> str:
+    """
+    :param safe_address:
+    :return: Redis key set while a ``process_decoded_internal_txs_for_safe_task``
+        for the Safe is waiting in the queue
+    """
+    return f"queued:tasks:process_decoded_internal_txs_for_safe_task:{safe_address}"
+
+
 @app.shared_task(bind=True)
 @task_timeout(timeout_seconds=LOCK_TIMEOUT)
 def process_decoded_internal_txs_task(self) -> int | None:
@@ -293,17 +308,45 @@ def process_decoded_internal_txs_task(self) -> int | None:
                     "Start process decoded internal txs for every Safe in a different task"
                 )
                 count = 0
+                already_queued = 0
+                redis = get_redis()
+                # 0 disables the check, so every pending Safe is always queued
+                queued_expiration = settings.PROCESSING_SAFE_QUEUED_EXPIRATION_SECONDS
                 for safe_to_process in (
                     InternalTxDecoded.objects.safes_pending_to_be_processed().iterator()
                 ):
-                    process_decoded_internal_txs_for_safe_task.delay(
-                        safe_to_process, reindex_master_copies=True
-                    )
+                    # Don't queue a Safe again while its previous task is waiting
+                    # in the queue or running. When workers are busy those tasks
+                    # would find nothing to process and make the queue grow
+                    queued_key = get_safe_processing_queued_key(safe_to_process)
+                    # Task timeout can be raised at any point, even when Redis
+                    # already stored the key, so consider it set until we know
+                    key_maybe_set = queued_expiration > 0
+                    try:
+                        if key_maybe_set and not redis.set(
+                            queued_key, 1, nx=True, ex=queued_expiration
+                        ):
+                            key_maybe_set = False
+                            already_queued += 1
+                            continue
+                        process_decoded_internal_txs_for_safe_task.delay(
+                            safe_to_process, reindex_master_copies=True
+                        )
+                    except BaseException:
+                        # Task was not queued (broker error, task timeout...)
+                        if key_maybe_set:
+                            with contextlib.suppress(RedisError):
+                                redis.delete(queued_key)
+                        raise
                     count += 1
 
                 (
-                    logger.info("%d Safes to process", count)
-                    if count
+                    logger.info(
+                        "%d Safes to process, %d were already queued",
+                        count,
+                        already_queued,
+                    )
+                    if count or already_queued
                     else logger.info("No Safes to process")
                 )
                 return count
@@ -322,8 +365,19 @@ def process_decoded_internal_txs_for_safe_task(
     :param reindex_master_copies: Trigger auto reindexing if a problem is found
     :return: Number of `InternalTxDecoded` processed
     """
-    with contextlib.suppress(LockError):
+    # Safe is kept as queued until processing is done. If not, it would be queued
+    # again while it's being processed and that task would find nothing to process
+    queued_key = get_safe_processing_queued_key(safe_address)
+    redis = get_redis()
+    lock_acquired = False
+    try:
         with only_one_running_task(self, lock_name_suffix=safe_address):
+            lock_acquired = True
+            # Task cannot run for longer than `LOCK_TIMEOUT`, so if worker is
+            # killed Safe will be queued again after that time
+            redis.set(queued_key, 1, ex=LOCK_TIMEOUT)
+            # Remove the key together with the locks if worker is stopped
+            ACTIVE_LOCKS.add(queued_key)
             logger.info("[%s] Start processing decoded internal txs", safe_address)
             index_service: IndexService = IndexServiceProvider()
             number_processed = index_service.process_decoded_txs_for_safe(safe_address)
@@ -331,6 +385,30 @@ def process_decoded_internal_txs_for_safe_task(
                 "[%s] Processed %d decoded transactions", safe_address, number_processed
             )
             return number_processed
+    except LockError:
+        if lock_acquired:
+            pass  # Lock expired while processing
+        elif not redis.exists(
+            get_task_lock_name(self.name, lock_name_suffix=safe_address)
+        ):
+            # Worker is stopping and task was not run, Safe must be queued again
+            redis.delete(queued_key)
+        else:
+            # Safe should be being processed by other task that will remove the
+            # key. But lock could belong to a killed worker, so don't keep the
+            # key for longer than that lock. `-1` is a key without expiration
+            ttl = redis.ttl(queued_key)
+            if ttl == -1 or ttl > LOCK_TIMEOUT:
+                redis.expire(queued_key, LOCK_TIMEOUT)
+    finally:
+        if lock_acquired:
+            # Lock is already released. If key was removed before, a task queued
+            # in between would not get the lock and key would not be removed
+            ACTIVE_LOCKS.discard(queued_key)
+            # Key expires on its own, don't fail a processed Safe for this
+            with contextlib.suppress(RedisError):
+                redis.delete(queued_key)
+    return None
 
 
 @app.shared_task(bind=True)
