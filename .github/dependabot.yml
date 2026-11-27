@@ -50,6 +50,13 @@ updates:
     open-pull-requests-limit: 10
     cooldown:
       default-days: 7
+    ignore:
+      # A new Python version also needs changes in pyproject.toml and CI, so it is
+      # upgraded by hand. Patch releases still come from Dependabot.
+      - dependency-name: "python"
+        update-types:
+          - "version-update:semver-major"
+          - "version-update:semver-minor"
     groups:
       docker:
         patterns:
