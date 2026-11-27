@@ -1,7 +1,7 @@
 # Dependabot only updates image versions in FROM lines
-FROM ghcr.io/astral-sh/uv:0.13.7 AS uv
+FROM ghcr.io/astral-sh/uv:0.13.10 AS uv
 
-FROM python:3.14.10-slim AS prod-deps
+FROM python:3.15.1-slim AS prod-deps
 COPY --from=uv /uv /usr/local/bin/uv
 WORKDIR /app
 RUN --mount=type=cache,id=uv,target=/root/.cache/uv \
@@ -9,7 +9,7 @@ RUN --mount=type=cache,id=uv,target=/root/.cache/uv \
     --mount=type=bind,source=uv.lock,target=uv.lock \
     uv sync --frozen --no-dev --no-install-project --compile-bytecode --link-mode=copy --no-python-downloads
 
-FROM python:3.14.10-slim AS production
+FROM python:3.15.1-slim AS production
 
 # The python image ships the stdlib without bytecode, and the app user cannot write
 # __pycache__ in /usr/local. pip in the base site-packages is not used.
