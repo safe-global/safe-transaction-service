@@ -2,10 +2,15 @@
 import os
 import subprocess
 import sys
+import threading
+import warnings
 from unittest import mock
 
 from django.conf import settings
 from django.test import SimpleTestCase
+
+from celery.exceptions import CPendingDeprecationWarning
+from celery.worker.consumer import Consumer
 
 from config.celery_app import app, close_db_connections
 
@@ -146,6 +151,50 @@ thread.join()
         self.assertFalse(mailbox.queue_exclusive)
         self.assertTrue(app.conf.event_queue_durable)
         self.assertFalse(app.conf.event_queue_exclusive)
+
+    def test_prefetch_count_not_reduced_after_broker_connection_loss(self):
+        """
+        A worker that loses the broker connection while running tasks reconnects with
+        its full prefetch count, and finished tasks do not try to restore it
+        """
+        concurrency = 100
+        prefetch_multiplier = 2
+        consumer = Consumer(
+            mock.Mock(),
+            app=app,
+            pool=mock.Mock(num_processes=concurrency),
+            controller=mock.Mock(),
+            initial_prefetch_count=concurrency * prefetch_multiplier,
+            prefetch_multiplier=prefetch_multiplier,
+        )
+        running_requests = {mock.Mock() for _ in range(50)}
+
+        with (
+            mock.patch(
+                "celery.worker.consumer.consumer.active_requests", running_requests
+            ),
+            # Unrelated warning about worker_cancel_long_running_tasks_on_connection_loss
+            warnings.catch_warnings(
+                category=CPendingDeprecationWarning, action="ignore"
+            ),
+        ):
+            # The handler logs the exception being handled
+            try:
+                raise ConnectionError("Broker connection lost")
+            except ConnectionError as exc:
+                consumer.on_connection_error_after_connected(exc)
+
+        self.assertFalse(app.conf.worker_enable_prefetch_count_reduction)
+        self.assertEqual(
+            consumer.initial_prefetch_count, concurrency * prefetch_multiplier
+        )
+
+        # Celery calls the restore when a task finishes after the reconnect
+        consumer.qos = mock.Mock(
+            value=consumer.initial_prefetch_count, _mutex=threading.Lock()
+        )
+        consumer._restore_prefetch_count_after_connection_restart(None)
+        consumer.qos.set.assert_not_called()
 
     def test_db_connections_closed_after_task(self):
         conn_to_close = mock.Mock(in_atomic_block=False)
