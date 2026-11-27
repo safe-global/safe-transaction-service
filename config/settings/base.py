@@ -274,6 +274,12 @@ CELERY_BROKER_CHANNEL_ERROR_RETRY = env.bool(
 CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = env.bool(
     "CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP", default=True
 )
+# With it on, gevent workers on RabbitMQ >=4 stay at the reduced prefetch after a
+# broker reconnect until they restart, and the tasks that run the restore are lost
+# https://docs.celeryq.dev/en/stable/userguide/configuration.html#worker-enable-prefetch-count-reduction
+CELERY_WORKER_ENABLE_PREFETCH_COUNT_REDUCTION = env.bool(
+    "CELERY_WORKER_ENABLE_PREFETCH_COUNT_REDUCTION", default=False
+)
 # https://docs.celeryq.dev/en/latest/userguide/configuration.html#task-result-backend-settings
 CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND", default=None)
 # http://docs.celeryproject.org/en/latest/userguide/configuration.html#std:setting-accept_content
