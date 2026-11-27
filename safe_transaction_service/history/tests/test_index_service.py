@@ -16,6 +16,7 @@ from ..cache import CacheSafeTxsView
 from ..models import (
     EthereumTx,
     IndexingStatus,
+    InternalTxDecoded,
     MultisigConfirmation,
     MultisigTransaction,
     SafeLastStatus,
@@ -208,11 +209,24 @@ class TestIndexService(EthereumTestCaseMixin, TestCase):
         MultisigTransactionFactory(
             safe=safe_status.address, origin="Something"
         )  # It shouldn't be deleted
+        decoded_tx = InternalTxDecodedFactory(
+            internal_tx___from=safe_status.address, processed=True
+        )  # It should be marked as not processed
+        decoded_tx_other_safe = InternalTxDecodedFactory(
+            processed=True
+        )  # It shouldn't be changed (safe not matching)
         self.assertEqual(MultisigTransaction.objects.count(), 4)
         self.assertIsNone(index_service.reprocess_addresses([safe_status.address]))
         self.assertEqual(SafeStatus.objects.count(), 0)
         self.assertEqual(SafeLastStatus.objects.count(), 0)
         self.assertEqual(MultisigTransaction.objects.count(), 3)
+        self.assertEqual(
+            dict(InternalTxDecoded.objects.values_list("internal_tx_id", "processed")),
+            {
+                decoded_tx.internal_tx_id: False,
+                decoded_tx_other_safe.internal_tx_id: True,
+            },
+        )
 
     def test_reprocess_all(self):
         index_service: IndexService = self.index_service
@@ -377,6 +391,55 @@ class TestIndexService(EthereumTestCaseMixin, TestCase):
         for multisig_tx in (multisig_tx_indexer, multisig_tx_api):
             multisig_tx.refresh_from_db()
             self.assertIsNotNone(multisig_tx.ethereum_tx_id)
+
+    def test_fix_out_of_order_marks_decoded_txs_not_processed(self):
+        """
+        Only the decoded txs of the Safe from the out of order timestamp are
+        marked as not processed
+        """
+        index_service: IndexService = self.index_service
+        safe_address = Account.create().address
+        out_of_order_block_timestamp = timezone.now()
+        older_block_timestamp = out_of_order_block_timestamp - datetime.timedelta(
+            minutes=1
+        )
+        newer_block_timestamp = out_of_order_block_timestamp + datetime.timedelta(
+            minutes=1
+        )
+
+        older_decoded_tx = InternalTxDecodedFactory(
+            internal_tx___from=safe_address,
+            internal_tx__ethereum_tx__block__timestamp=older_block_timestamp,
+            processed=True,
+        )
+        decoded_tx_out_of_order = InternalTxDecodedFactory(
+            internal_tx___from=safe_address,
+            internal_tx__ethereum_tx__block__timestamp=out_of_order_block_timestamp,
+            processed=True,
+        )
+        newer_decoded_tx = InternalTxDecodedFactory(
+            internal_tx___from=safe_address,
+            internal_tx__ethereum_tx__block__timestamp=newer_block_timestamp,
+            processed=True,
+        )
+        decoded_tx_other_safe = InternalTxDecodedFactory(
+            internal_tx__ethereum_tx__block__timestamp=newer_block_timestamp,
+            processed=True,
+        )
+
+        index_service.fix_out_of_order(
+            safe_address, decoded_tx_out_of_order.internal_tx
+        )
+
+        self.assertEqual(
+            dict(InternalTxDecoded.objects.values_list("internal_tx_id", "processed")),
+            {
+                older_decoded_tx.internal_tx_id: True,
+                decoded_tx_out_of_order.internal_tx_id: False,
+                newer_decoded_tx.internal_tx_id: False,
+                decoded_tx_other_safe.internal_tx_id: True,
+            },
+        )
 
     def test_fix_out_of_order_late_exec_transaction(self):
         """

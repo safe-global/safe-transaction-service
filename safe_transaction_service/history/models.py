@@ -1383,7 +1383,8 @@ class InternalTxDecodedQuerySet(models.QuerySet):
         :param safe_address:
         :return: Queryset of all InternalTxDecoded for one Safe with `safe_address`
         """
-        # Use denormalized safe_address field for efficient filtering (avoids JOIN)
+        # The indexes on `safe_address` are partial: it is only indexed together with
+        # `processed=False` or `function_name="setup"`
         return self.filter(safe_address=safe_address)
 
     def processed(self):

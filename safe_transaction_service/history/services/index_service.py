@@ -416,7 +416,9 @@ class IndexService:
         logger.info("Mark all internal txs decoded as not processed")
         queryset = InternalTxDecoded.objects.all()
         if addresses:
-            queryset = queryset.filter(safe_address__in=addresses)
+            queryset = queryset.filter(
+                internal_tx__in=InternalTx.objects.filter(_from__in=addresses)
+            )
         queryset.update(processed=False)
 
     def _reset_executed_multisig_txs(
@@ -525,8 +527,12 @@ class IndexService:
             "[%s] Marking InternalTxDecoded newer than timestamp as not processed",
             address,
         )
+        # The indexes on `safe_address` are partial, so the Safe is matched through
+        # the `InternalTx` index on `_from` and `timestamp`
         InternalTxDecoded.objects.filter(
-            safe_address=address, internal_tx__timestamp__gte=timestamp
+            internal_tx__in=InternalTx.objects.for_safe(address).filter(
+                timestamp__gte=timestamp
+            )
         ).update(processed=False)
         logger.info("[%s] Removing SafeStatus newer than timestamp", address)
         SafeStatus.objects.filter(
