@@ -2,7 +2,7 @@
 import datetime
 import logging
 from collections import OrderedDict
-from collections.abc import Collection
+from collections.abc import Callable, Collection
 from dataclasses import dataclass
 
 from django.db import transaction
@@ -536,10 +536,14 @@ class IndexService:
         SafeLastStatus.objects.filter(address=address).delete()
         logger.info("[%s] Ended fixing out of order", address)
 
-    def process_all_decoded_txs(self) -> int:
+    def process_all_decoded_txs(
+        self, should_stop: Callable[[], bool] = lambda: False
+    ) -> int:
         """
         Process all the pending `InternalTxDecoded` for every Safe
 
+        :param should_stop: Checked before processing every batch. When it returns
+            ``True`` processing stops, even if there are pending transactions
         :return: Number of `InternalTxDecoded` processed
         """
         # Use chunks for memory issues
@@ -548,7 +552,7 @@ class IndexService:
         # Don't check out of order multiple times for a Safe
         checked_out_of_order: set[ChecksumAddress] = set()
 
-        while True:
+        while not should_stop():
             logger.debug("Getting pending transactions to process for all Safes")
             internal_txs_decoded = list(
                 InternalTxDecoded.objects.pending_for_safes()[
@@ -599,11 +603,17 @@ class IndexService:
             )
         return total_processed_txs
 
-    def process_decoded_txs_for_safe(self, safe_address: ChecksumAddress) -> int:
+    def process_decoded_txs_for_safe(
+        self,
+        safe_address: ChecksumAddress,
+        should_stop: Callable[[], bool] = lambda: False,
+    ) -> int:
         """
         Process all the pending `InternalTxDecoded` for a Safe
 
         :param safe_address:
+        :param should_stop: Checked before processing every batch. When it returns
+            ``True`` processing stops, even if there are pending transactions
         :return: Number of `InternalTxDecoded` processed
         """
 
@@ -624,7 +634,7 @@ class IndexService:
 
         # Use chunks for memory issues
         total_processed_txs = 0
-        while True:
+        while not should_stop():
             logger.debug("[%s] Fetching batch of transactions to process", safe_address)
             internal_txs_decoded = list(
                 InternalTxDecoded.objects.pending_for_safe(safe_address)[

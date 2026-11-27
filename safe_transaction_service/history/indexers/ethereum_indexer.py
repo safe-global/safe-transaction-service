@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: FSL-1.1-MIT
 import time
 from abc import ABC, abstractmethod
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from contextlib import contextmanager
 from logging import getLogger
 from typing import Any
@@ -477,10 +477,12 @@ class EthereumIndexer(ABC):
 
         return processed_elements, from_block_number, to_block_number, updated
 
-    def start(self) -> tuple[int, int]:
+    def start(self, should_stop: Callable[[], bool] = lambda: False) -> tuple[int, int]:
         """
         Find and process relevant data for existing database addresses
 
+        :param should_stop: Checked before processing every block range. When it
+            returns ``True`` indexing stops, even if addresses are not updated yet
         :return: (number of elements processed, number of blocks processed)
         """
         current_block_number = self.ethereum_client.current_block_number
@@ -503,7 +505,7 @@ class EthereumIndexer(ABC):
                 self.__class__.__name__,
             )
             updated = False
-            while not updated:
+            while not updated and not should_stop():
                 (
                     processed_elements,
                     from_block_number,
@@ -533,7 +535,12 @@ class EthereumIndexer(ABC):
             )
 
         # Then process addresses that are not updated (usually far from the `current_block_number`)
-        if not_updated_addresses := self.get_not_updated_addresses(
+        if should_stop():
+            logger.info(
+                "%s: Stopped before processing not updated addresses",
+                self.__class__.__name__,
+            )
+        elif not_updated_addresses := self.get_not_updated_addresses(
             current_block_number
         ):
             logger.info(
@@ -542,7 +549,7 @@ class EthereumIndexer(ABC):
             )
 
             updated = False
-            while not updated:
+            while not updated and not should_stop():
                 (
                     processed_elements,
                     from_block_number,

@@ -1,4 +1,6 @@
 # SPDX-License-Identifier: FSL-1.1-MIT
+from unittest import mock
+
 from django.conf import settings
 from django.test import TestCase
 
@@ -33,3 +35,23 @@ class TestProxyFactoryIndexer(SafeTestCaseMixin, TestCase):
         # Test if only 1 Safe was created
         self.assertEqual(SafeContract.objects.count(), 1 + safe_contracts_count)
         self.assertTrue(SafeContract.objects.get(address=safe_contract_address))
+
+    def test_start_stops_when_should_stop(self):
+        """
+        `start` stops before the next block range when `should_stop` returns
+        `True`, even if addresses are not updated yet
+        """
+        ProxyFactoryFactory()
+        proxy_factory_indexer = ProxyFactoryIndexerProvider()
+        with mock.patch.object(
+            proxy_factory_indexer,
+            "process_addresses",
+            return_value=([], 1, 10, False),  # Never updated
+        ) as process_addresses_mock:
+            self.assertEqual(
+                proxy_factory_indexer.start(
+                    should_stop=lambda: process_addresses_mock.call_count >= 2
+                ),
+                (0, 10),
+            )
+        self.assertEqual(process_addresses_mock.call_count, 2)
