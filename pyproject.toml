@@ -56,6 +56,7 @@ dev = [
     "pytest-env",
     "pytest-rerunfailures",
     "pytest-sugar",
+    "trustme",
 ]
 
 [build-system]

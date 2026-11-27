@@ -35,7 +35,10 @@ from ..services import (
     IndexService,
     ReorgService,
 )
-from ..services.collectibles_service import CollectibleWithMetadata
+from ..services.collectibles_service import (
+    CollectibleWithMetadata,
+    MetadataRetrievalException,
+)
 from ..services.index_service import SpecificIndexingStatus
 from ..services.queue_service_sync_service import QUEUE_SERVICE_SYNC_TIME_LIMIT_SECONDS
 from ..tasks import (
@@ -421,6 +424,46 @@ class TestTasks(TestCase):
             self.assertEqual(
                 json.loads(redis.get(metadata_cache_key)), dataclasses.asdict(expected)
             )
+            redis.delete(metadata_cache_key)
+
+    @patch.object(
+        CollectiblesService,
+        "get_metadata",
+        autospec=True,
+        side_effect=MetadataRetrievalException("https://10.0.0.5/token/16"),
+    )
+    def test_retry_get_metadata_task_not_retryable_error(
+        self, get_metadata_mock: MagicMock
+    ):
+        """A metadata error that is not a timeout ends the task without retrying it or changing the cache."""
+        collectible_address = Account.create().address
+        collectible_id = 16
+        collectible_without_metadata = CollectibleWithMetadata(
+            "Octopus",
+            "OCT",
+            "https://random-address.org/logo.png",
+            collectible_address,
+            collectible_id,
+            "https://random-address.org/info-16.json",
+            {},
+        )
+        with self.settings(COLLECTIBLES_ENABLE_DOWNLOAD_METADATA=True):
+            redis = get_redis()
+            metadata_cache_key = CollectiblesServiceProvider().get_metadata_cache_key(
+                collectible_address, collectible_id
+            )
+            cached_collectible = json.dumps(
+                dataclasses.asdict(collectible_without_metadata)
+            )
+            redis.set(metadata_cache_key, cached_collectible, ex=300)
+
+            with patch.object(retry_get_metadata_task, "retry") as retry_mock:
+                self.assertIsNone(
+                    retry_get_metadata_task(collectible_address, collectible_id)
+                )
+            get_metadata_mock.assert_called_once()
+            retry_mock.assert_not_called()
+            self.assertEqual(redis.get(metadata_cache_key).decode(), cached_collectible)
             redis.delete(metadata_cache_key)
 
     def test_remove_not_trusted_multisig_txs_task(self):
